@@ -4,20 +4,20 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="EasySQL",
-    version="1.0.0",
+    name="PyEasySQL",
+    version="1.0",
     license='MIT License',
     author="Ashenguard",
     author_email="Ashenguard@agmdev.com",
-    description="Extra tools for discord.py developers",
+    description="SQL Database management without even a SQL line",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/ashenguard/easysql",
+    url="https://github.com/ashengaurd/easysql",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
-        "Development Status :: 4 - Beta",
+        "Development Status :: 5 - Production/Stable",
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
