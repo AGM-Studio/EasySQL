@@ -1,10 +1,62 @@
 from .ABC import SQLType
 
 
+class BIGINT(SQLType):
+    """8 Bytes integer or 64 Bits"""
+    @property
+    def name(self):
+        return 'BIGINT'
+
+    def parse(self, value):
+        return f'{int(value)}'
+
+    @property
+    def default(self):
+        return 0
+
+    def cast(self, value):
+        return int(value)
+
+
 class INTEGER(SQLType):
+    """4 Bytes integer or 32 Bits"""
     @property
     def name(self):
         return 'INT'
+
+    def parse(self, value):
+        return f'{int(value)}'
+
+    @property
+    def default(self):
+        return 0
+
+    def cast(self, value):
+        return int(value)
+
+
+class SMALLINT(SQLType):
+    """2 Bytes integer or 16 Bits"""
+    @property
+    def name(self):
+        return 'SMALLINT'
+
+    def parse(self, value):
+        return f'{int(value)}'
+
+    @property
+    def default(self):
+        return 0
+
+    def cast(self, value):
+        return int(value)
+
+
+class TINYINT(SQLType):
+    """1 Byte integer or 8 Bits"""
+    @property
+    def name(self):
+        return 'TINYINT'
 
     def parse(self, value):
         return f'{int(value)}'
@@ -114,7 +166,7 @@ class DECIMAL(SQLType):
 class BOOL(SQLType):
     @property
     def name(self):
-        return f'BIT(1)'
+        return f'BOOL'
 
     def parse(self, value):
         return f'1' if value else f'0'
