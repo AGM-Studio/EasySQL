@@ -1,4 +1,7 @@
-.idea
-build
-dist
-PyEasySQL.egg-info
+/.idea
+/build
+/dist
+/PyEasySQL.egg-info
+/notes.md
+/tests/*
+/tests/

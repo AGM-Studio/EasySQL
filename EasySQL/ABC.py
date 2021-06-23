@@ -1,8 +1,6 @@
 from abc import ABC
 from typing import Union, TypeVar, List, Set, Tuple, Callable, Any
 
-from EasySQL import SQLTypeException
-
 
 class SQLType:
     def __init__(self, name, *args, caster: Callable[[Any], Any] = None, get_caster: Callable[["SQLType"], Callable[[Any], Any]] = None, default: Any = None, parser: Callable[[Any], str] = None, modifiable: bool = False):
@@ -29,6 +27,8 @@ class SQLType:
     def __call__(self, *args):
         if self._modifiable or not args:
             return SQLType(self._name, *args, caster=self._caster, default=self._default)
+
+        from EasySQL import SQLTypeException
         raise SQLTypeException('this sql type is not accepting new arguments')
 
     def __eq__(self, other):
