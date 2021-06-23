@@ -1,185 +1,26 @@
 from .ABC import SQLType
 
 
-class BIGINT(SQLType):
-    """8 Bytes integer or 64 Bits"""
-    @property
-    def name(self):
-        return 'BIGINT'
-
-    def parse(self, value):
-        return f'{int(value)}'
-
-    @property
-    def default(self):
-        return 0
-
-    def cast(self, value):
+def _int_cast_(size):
+    def cast(value):
+        value = int(value)
+        if value.bit_length() > size:
+            raise ValueError(f'can only accept {size} bits but got {value.bit_length()} bits')
         return int(value)
 
-
-class INTEGER(SQLType):
-    """4 Bytes integer or 32 Bits"""
-    @property
-    def name(self):
-        return 'INT'
-
-    def parse(self, value):
-        return f'{int(value)}'
-
-    @property
-    def default(self):
-        return 0
-
-    def cast(self, value):
-        return int(value)
+    return cast
 
 
-class SMALLINT(SQLType):
-    """2 Bytes integer or 16 Bits"""
-    @property
-    def name(self):
-        return 'SMALLINT'
+INT64 = BIGINT = SQLType('BIGINT', caster=_int_cast_(64), default=0)
+INT32 = INT = INTEGER = SQLType('INT', caster=_int_cast_(32), default=0)
+INT16 = SMALLINT = SQLType('SMALLINT', caster=_int_cast_(16), default=0)
+INT8 = TINYINT = SQLType('TINYINT', caster=_int_cast_(8), default=0)
 
-    def parse(self, value):
-        return f'{int(value)}'
+BIT = SQLType('BIT', 1, get_caster=lambda self: _int_cast_(self.args[0]), default=0, modifiable=True)
+BOOL = SQLType('BIT', 1, caster=lambda value: True if value else False, default=False, parser=lambda value: '1' if value else '0')
 
-    @property
-    def default(self):
-        return 0
+FLOAT = SQLType('FLOAT', caster=float, default=0.0)
+DOUBLE = SQLType('DOUBLE', 12, 6, caster=float, default=0.0, modifiable=True)
+DEC = DECIMAL = SQLType('DECIMAL', 12, 6, caster=float, default=0.0, modifiable=True)
 
-    def cast(self, value):
-        return int(value)
-
-
-class TINYINT(SQLType):
-    """1 Byte integer or 8 Bits"""
-    @property
-    def name(self):
-        return 'TINYINT'
-
-    def parse(self, value):
-        return f'{int(value)}'
-
-    @property
-    def default(self):
-        return 0
-
-    def cast(self, value):
-        return int(value)
-
-
-class STRING(SQLType):
-    def __init__(self, size: int = 255):
-        self.size = size
-
-    @property
-    def name(self):
-        return f'VARCHAR({self.size})'
-
-    def parse(self, value):
-        return f"'{str(value)}'"
-
-    @property
-    def default(self):
-        return ''
-
-    def cast(self, value):
-        return str(value)
-
-
-class BIT(SQLType):
-    def __init__(self, size: int = 1):
-        self.size = size
-
-    @property
-    def name(self):
-        return f'BIT({self.size})'
-
-    def parse(self, value):
-        return f'{int(value)}'
-
-    @property
-    def default(self):
-        return 0
-
-    def cast(self, value):
-        return int(value)
-
-
-class FLOAT(SQLType):
-    @property
-    def name(self):
-        return 'FLOAT'
-
-    def parse(self, value):
-        return f'{float(value)}'
-
-    @property
-    def default(self):
-        return 0
-
-    def cast(self, value):
-        return float(value)
-
-
-class DOUBLE(SQLType):
-    def __init__(self, size: int = 12, dec: int = 6):
-        self.size = size
-        self.dec = dec
-
-    @property
-    def name(self):
-        return f'DOUBLE({self.size},{self.dec})'
-
-    def parse(self, value):
-        return f'{float(value)}'
-
-    @property
-    def default(self):
-        return 0
-
-    def cast(self, value):
-        return float(value)
-
-
-class DECIMAL(SQLType):
-    def __init__(self, size: int = 12, dec: int = 6):
-        self.size = size
-        self.dec = dec
-
-    @property
-    def name(self):
-        return f'DECIMAL({self.size},{self.dec})'
-
-    def parse(self, value):
-        return f'{float(value)}'
-
-    @property
-    def default(self):
-        return 0
-
-    def cast(self, value):
-        return float(value)
-
-
-class BOOL(SQLType):
-    @property
-    def name(self):
-        return f'BOOL'
-
-    def parse(self, value):
-        return f'1' if value else f'0'
-
-    @property
-    def default(self):
-        return False
-
-    def cast(self, value):
-        return True if value else False
-
-
-INT = INTEGER
-DEC = DECIMAL
-VARCHAR = STRING
-CHAR = STRING
+STRING = CHAR = VARCHAR = SQLType('VARCHAR', 255, caster=str, default='', modifiable=True)

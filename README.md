@@ -2,13 +2,23 @@
 This library allow you to run SQL Databases without knowing even SQL.  
 This library will create SQL queries and execute them as you request and is very simple to use.
 
+### Support
+You can find support on our discord server here:
+> https://discord.gg/6exsySK  
+> Pay us a visit there ✌
+
 
 ## How to install
+![](https://img.shields.io/github/v/release/Ashengaurd/EasySQL?label=Release&logo=github&style=plastic)
+![](https://img.shields.io/github/last-commit/Ashengaurd/EasySQL/master?label=Date&logo=git&logoColor=blue&style=plastic)  
+![](https://img.shields.io/github/v/release/Ashengaurd/EasySQL?include_prereleases&label=Development&logo=github&style=plastic)
+![](https://img.shields.io/github/last-commit/Ashengaurd/EasySQL/development?label=Date&logo=git&logoColor=red&style=plastic)  
 To install just use following command
 ```shell
 pip install EasySQL
 ```
 This library will have dev/beta builds on the github, to install them you can use
+
 ```shell
 pip install --upgrade git+https://github.com/Ashengaurd/EasySQL.git
 ```
@@ -27,9 +37,9 @@ database = EasySQL.EasyDatabase(host='127.0.0.1', port=3306,
                                 user='username', password='PASSWORD')
 
 # Define tables and columns
-col1 = EasySQL.EasyColumn('ID', EasySQL.INT(), primary=True, auto_increment=True)
-col2 = EasySQL.EasyColumn('Name', EasySQL.STRING(256), not_null=True, default='Missing')
-col3 = EasySQL.EasyColumn('Premium', EasySQL.BOOL(), not_null=True)
+col1 = EasySQL.EasyColumn('ID', EasySQL.INT, primary=True, auto_increment=True)
+col2 = EasySQL.EasyColumn('Name', EasySQL.STRING(255), not_null=True, default='Missing')
+col3 = EasySQL.EasyColumn('Premium', EasySQL.BOOL, not_null=True)
 
 table = EasySQL.EasyTable(database, 'Users', [col1, col2, col3])
 
