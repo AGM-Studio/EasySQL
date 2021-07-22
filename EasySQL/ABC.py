@@ -33,13 +33,19 @@ class SQLType:
 
     def __eq__(self, other):
         try:
-            return other.name == self.name
+            return other.name == self.name and other.args == self.args
         except Exception:
             return False
 
+    def __hash__(self):
+        return hash((self.name, self.args))
+
+    def __repr__(self):
+        return f'<SQLTYPE "{self.name}">'
+
     @property
     def name(self):
-        return f'{self._name}({",".join(self._args)})' if self._args else self._name
+        return f'{self._name}({",".join([str(arg) for arg in self._args])})' if self._args else self._name
 
     def cast(self, value):
         return self._caster(value)
@@ -54,6 +60,36 @@ class SQLType:
     @property
     def args(self):
         return self._args
+
+    @property
+    def modifiable(self):
+        return self._modifiable
+
+
+class CHARSET:
+    def __init__(self, name, collation, maxlen=1, description=None):
+        self._name = name
+        self.__doc__ = description
+        self._collation = collation
+        self._maxlen = maxlen
+
+    def __repr__(self):
+        return f'<CHARSET "{self._name}">'
+
+    def __str__(self):
+        return self._name
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def collation(self):
+        return self._collation
+
+    @property
+    def maxlen(self):
+        return self._maxlen
 
 
 class SQLExecutable(ABC):

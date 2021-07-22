@@ -2,7 +2,7 @@ from typing import List, Optional, Union, Any, Dict
 
 import mysql.connector
 
-from .ABC import ListOrSingle, SQLCommandExecutable, Collection, SQLType
+from .ABC import ListOrSingle, SQLCommandExecutable, Collection, SQLType, CHARSET
 from .Exceptions import MissingArgumentException, MisMatchException, DatabaseSafetyException
 from .Logging import logger
 from .Where import Where
@@ -50,21 +50,31 @@ class EasyColumn:
 
 
 class EasyDatabase:
-    def __init__(self, host="127.0.0.1", port=3306, database=None, user="root", password=None):
+    def __init__(self, host="127.0.0.1", port=3306, database=None, user="root", password=None, charset: Optional[CHARSET] = None):
         if database is None:
-            raise MissingArgumentException('Database argument is required.')
+            raise MissingArgumentException('database argument is required.')
         if password is None:
-            raise MissingArgumentException('Password is not provided.')
+            raise MissingArgumentException('password is not provided.')
+        if charset is not None and not isinstance(charset, CHARSET):
+            raise TypeError(f'charset must be type of "CHARSET" or "NONE", not "{type(charset)}"')
 
         self._database = database
         self._password = password
         self._host = host
         self._port = port
         self._user = user
+        self._charset = charset
 
         self._connection = None
         self._safe = True
         self.prepare()
+
+        if charset is not None:
+            try:
+                command = f'ALTER DATABASE {self._database} CHARACTER SET = {charset.name} COLLATE = {charset.collation};'
+                self.execute(command)
+            except Exception as e:
+                logger.warn(f"Altering the charset of database failed due {str(e)}")
 
     @property
     def safe(self):
@@ -118,6 +128,23 @@ class EasyDatabase:
     def commit(self):
         return self.connection.commit()
 
+    def table(self, name: str, columns: List[EasyColumn], auto_prepare=True):
+        return EasyTable(self, name, columns, auto_prepare)
+
+    def describe_table(self, table: 'EasyTable'):
+        from EasySQL import string_to_type
+
+        result = self.execute(f'DESCRIBE {self.name}.{table.name};', buffered=True).fetchall()
+        columns = []
+        for column in result:
+            sqltype = string_to_type(column[1])
+            if sqltype is None:
+                raise TypeError(f'Unable to recognize name "{column[1]}" as a SQLType')
+
+            columns.append(EasyColumn(column[0], sqltype, not_null=column[2] == 'NO', primary=column[3] == 'PRI', default=column[4]))
+
+        return tuple(columns)
+
 
 class EasyTable:
     def __init__(self, database: EasyDatabase, name: str, columns: List[EasyColumn], auto_prepare=True):
@@ -149,9 +176,32 @@ class EasyTable:
 
         return {columns[i]: values[i] for i in range(len(columns))}
 
-    def create(self):
-        command = f"CREATE TABLE IF NOT EXISTS {self._name} ({', '.join([column.get_sql() for column in self._columns])});"
-        self._database.execute(command)
+    def prepare(self, alter_columns=True):
+        command = f'SHOW TABLES FROM {self._database.name} WHERE Tables_in_{self._database.name} = \'{self._name}\';'
+        exists = bool(self._database.execute(command, buffered=True).fetchall())
+        if not exists:
+            if self._columns:
+                command = f"CREATE TABLE IF NOT EXISTS {self._name} ({', '.join([column.get_sql() for column in self._columns])});"
+                self._database.execute(command)
+            else:
+                raise MissingArgumentException('Table defnied does not exists, as there is no columns available to create one')
+        else:
+            columns = self._database.describe_table(self)
+            if self._columns and self.columns != columns:
+                lc1 = list(self._columns)
+                lc2 = list(columns)
+                size = max(len(lc1), len(lc2))
+                length = len(str(max(lc1, key=lambda val: len(str(val)))))
+                for i in range(len(lc1), size):
+                    lc1.append("-" * length)
+                for i in range(len(lc2), size):
+                    lc2.append("-" * length)
+
+                logger.warn(f'Columns specified do not match with existing ones:\n\tSpecified:{" " * (length - 10)}\t\tExisting:\n\t' +
+                            '\n\t'.join([f'{lc1[i]}{" " * (length - len(str(lc1[i])))}\t\t{lc2[i]}' for i in range(size)]))
+                raise MisMatchException('Existing table does not match with specified columns.')
+            else:
+                self._columns = columns
 
     @property
     def columns(self):

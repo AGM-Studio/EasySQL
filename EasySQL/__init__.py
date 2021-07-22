@@ -1,4 +1,5 @@
 from .ABC import *
+from .Characters import *
 from .Classes import *
 from .Logging import enable_debug, disable_debug
 from .Types import *

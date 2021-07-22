@@ -25,3 +25,28 @@ DOUBLE = SQLType('DOUBLE', 12, 6, caster=float, default=0.0, modifiable=True)
 DEC = DECIMAL = SQLType('DECIMAL', 12, 6, caster=float, default=0.0, modifiable=True)
 
 STRING = CHAR = VARCHAR = SQLType('VARCHAR', 255, caster=str, default='', parser=lambda value: f'{value}', modifiable=True)
+
+type_dict = {
+    INT64: ['bigint'],
+    INT32: ['int', 'integer'],
+    INT24: ['mediumint'],
+    INT16: ['smallint'],
+    INT8: ['tinyint'],
+    BIT: ['bit'],
+    BOOL: ['bool', 'boolean'],
+    FLOAT: ['float'],
+    DOUBLE: ['double'],
+    DEC: ['decimal', 'dec'],
+    STRING: ['varchar', 'char']
+}
+
+
+def string_to_type(string: str):
+    args = string[string.find('(') + 1:string.rfind(')')]
+    string = string[:string.find('(')].lower()
+    for key, value in type_dict.items():
+        if string in value:
+            if not key.modifiable:
+                return key
+            return key(*[int(arg) for arg in args.split(',')])
+    return None
