@@ -20,10 +20,10 @@ class EasyColumn:
         self.not_null = not_null
 
     def __hash__(self):
-        return hash((self.name,))
+        return hash((self.name, self.sql_type))
 
     def __repr__(self):
-        return f'<EasyColumn "{self.name}" type={self.sql_type}>'
+        return f'<EasyColumn "{self.name}" type={self.sql_type.name}>'
 
     def __eq__(self, other):
         if isinstance(other, EasyColumn):
@@ -78,6 +78,8 @@ class EasyDatabase:
         try:
             self._connection.ping()
         except Exception as e:
+            if self._connection is None:
+                e = 'the initializing connection'
             logger.info(f'Connecting to the database called {self._database} due {e}')
             self._connection = mysql.connector.connect(host=self._host, port=self._port, database=self._database, user=self._user, password=self._password)
         return self._connection
@@ -90,8 +92,21 @@ class EasyDatabase:
         self._cursor = self.connection.cursor()
         return self._cursor
 
-    def execute(self, operation, params=(), auto_commit=True):
-        cursor = self.cursor
+    @property
+    def buffered_cursor(self):
+        self._cursor = self.connection.cursor(buffered=True)
+        return self._cursor
+
+    @property
+    def charset(self):
+        return self._charset
+
+    @property
+    def name(self):
+        return self._database
+
+    def execute(self, operation, params=(), buffered=False, auto_commit=True):
+        cursor = self.buffered_cursor if buffered else self.cursor
 
         logger.debug(f'SQL command has been requested to be executed:\n\tCommand: "{operation}"\n\tParameters: {params}\n\tCommit: {auto_commit}')
         cursor.execute(operation, params)
@@ -105,12 +120,13 @@ class EasyDatabase:
 
 
 class EasyTable:
-    def __init__(self, database: EasyDatabase, name: str, columns: List[EasyColumn]):
+    def __init__(self, database: EasyDatabase, name: str, columns: List[EasyColumn], auto_prepare=True):
         self._database = database
         self._name = name
-        self._columns = columns
+        self._columns = tuple(columns)
 
-        self.create()
+        if auto_prepare:
+            self.prepare()
 
     def assert_columns(self, columns):
         if columns is None or columns == '*':

@@ -12,10 +12,10 @@ You can find support on our discord server here:
 ![](https://img.shields.io/github/v/release/Ashengaurd/EasySQL?label=Release&logo=github&style=plastic)
 ![](https://img.shields.io/github/last-commit/Ashengaurd/EasySQL/master?label=Date&logo=git&logoColor=blue&style=plastic)  
 ![](https://img.shields.io/github/v/release/Ashengaurd/EasySQL?include_prereleases&label=Development&logo=github&style=plastic)
-![](https://img.shields.io/github/last-commit/Ashengaurd/EasySQL/development?label=Date&logo=git&logoColor=red&style=plastic)  
+![](https://img.shields.io/github/last-commit/Ashengaurd/EasySQL?label=Date&logo=git&logoColor=red&style=plastic)  
 To install just use following command
 ```shell
-pip install EasySQL
+pip install PyEasySQL
 ```
 This library will have dev/beta builds on the github, to install them you can use
 
