@@ -7,6 +7,10 @@ You can find support on our discord server here:
 > https://discord.gg/6exsySK  
 > Pay us a visit there ✌
 
+### Wiki
+The official wiki of this library is now available at Github
+> https://github.com/Ashengaurd/EasySQL/wiki
+
 
 ## How to install
 ![](https://img.shields.io/github/v/release/Ashengaurd/EasySQL?label=Release&logo=github&style=plastic)
@@ -26,8 +30,7 @@ pip install --upgrade git+https://github.com/Ashengaurd/EasySQL.git
 By installing this library following libraries and their dependencies will be installed too.
 > mysql-connector: Which is the basic library for connecting to database
 
-# Examples
-
+# Example
 ```python
 import EasySQL
 
