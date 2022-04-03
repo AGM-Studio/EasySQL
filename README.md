@@ -1,4 +1,7 @@
 # EasySQL
+![Downloads](https://pepy.tech/badge/pyeasysql)
+![Downloads](https://pepy.tech/badge/pyeasysql/week)
+![Downloads](https://pepy.tech/badge/pyeasysql/month)  
 This library allow you to run SQL Databases without knowing even SQL.  
 This library will create SQL queries and execute them as you request and is very simple to use.
 
