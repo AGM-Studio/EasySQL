@@ -17,6 +17,21 @@ class Where(SQLCommand):
     def NOT(self):
         return Where(f'NOT {self.value}')
 
+    def __and__(self, other):
+        if isinstance(other, Where):
+            return self.AND(other)
+
+        raise TypeError(f"unsupported operand type(s) for &: '{type(self)}' and '{type(other)}'")
+
+    def __or__(self, other):
+        if isinstance(other, Where):
+            return self.OR(other)
+
+        raise TypeError(f"unsupported operand type(s) for |: '{type(self)}' and '{type(other)}'")
+
+    def __invert__(self):
+        return self.NOT()
+
 
 class WhereIsEqual(Where):
     def __init__(self, column, value):

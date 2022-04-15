@@ -5,10 +5,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="PyEasySQL",
-    version="1.3.0",
+    version="1.4.0",
     license='MIT License',
     author="Ashenguard",
-    author_email="Ashenguard@agmdev.com",
+    author_email="Ashenguard@agmdev.xyz",
     description="SQL Database management without even a SQL line",
     long_description=long_description,
     long_description_content_type="text/markdown",
