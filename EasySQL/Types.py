@@ -24,7 +24,7 @@ FLOAT = SQLType('FLOAT', caster=float, default=0.0)
 DOUBLE = SQLType('DOUBLE', 12, 6, caster=float, default=0.0, modifiable=True)
 DEC = DECIMAL = SQLType('DECIMAL', 12, 6, caster=float, default=0.0, modifiable=True)
 
-STRING = CHAR = VARCHAR = SQLType('VARCHAR', 255, caster=str, default='', parser=lambda value: f'{value}', modifiable=True)
+STRING = CHAR = VARCHAR = SQLType('VARCHAR', 255, caster=lambda value: f"'{value}'", default='', parser=lambda value: f'{value}', modifiable=True)
 
 type_dict = {
     INT64: ['bigint'],
