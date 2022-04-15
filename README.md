@@ -75,3 +75,4 @@ database.remove_safety(confirm=True)
 # Now there will be no error, it will clean the all data that's why we had safety lock
 table.delete()
 ```
+
