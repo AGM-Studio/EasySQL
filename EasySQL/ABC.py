@@ -7,6 +7,8 @@ class SQLType:
         self._name = name
         self._args = args
 
+        self._modify_args = dict(caster=caster, get_caster=get_caster, default=default, parser=parser)
+
         if caster is None and get_caster is not None:
             caster = get_caster(self)
 
@@ -21,12 +23,12 @@ class SQLType:
         self._caster = caster
         self._default = default
 
-        self._parser = parser if parser else str
+        self._parser = parser if parser is not None else str
         self._modifiable = modifiable
 
     def __call__(self, *args):
         if self._modifiable or not args:
-            return SQLType(self._name, *args, caster=self._caster, default=self._default)
+            return SQLType(self._name, *args, **self._modify_args, modifiable=self._modifiable)
 
         from EasySQL import SQLTypeException
         raise SQLTypeException('this sql type is not accepting new arguments')
