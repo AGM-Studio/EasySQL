@@ -245,6 +245,37 @@ class EasyTable:
             self.insert(values)
 
 
+class SelectData:
+    def __init__(self, table: EasyTable, data_array: Union[tuple, list], columns: Union[tuple, list]):
+        if len(data_array) != len(columns):
+            raise MisMatchException('Data does not match the columns')
+
+        self._table = table
+        self._data = {}
+        for i in range(len(data_array)):
+            col = self._table.get_column(columns[i])
+
+            if col is None:
+                raise MisMatchException(f'Unable to find `{columns[i]}` in the table')
+
+            self._data[col] = col.cast(data_array[i])
+
+    def __repr__(self):
+        return f'<SelectData "{self._table.name}">'
+
+    def get(self, column):
+        col = self._table.get_column(column)
+
+        if col is None or col not in self._data.keys():
+            raise ValueError(f'Unable to find `{column}` in data')
+
+        return self._data[col]
+
+    @property
+    def data(self):
+        return self._data.copy()
+
+
 class Select(SQLCommandExecutable):
     def __init__(self, database: EasyDatabase, columns: Collection[EasyColumn] = None, table: EasyTable = None, where: Where = None):
         if table and columns:
@@ -273,14 +304,15 @@ class Select(SQLCommandExecutable):
         columns = ', '.join([column.name for column in self._columns]) if self._columns else '*'
         return f"SELECT {columns} FROM {self._table.name}" + (f' {self._where.get_value()};' if self._where else ";")
 
-    def execute(self):
+    def execute(self) -> Union[None, SelectData, List[SelectData]]:
         self._asserts()
         result = self._database.execute(self.get_value(), auto_commit=False).fetchall()
         columns = self._columns if self._columns else self._table.columns
         new_result = []
         for item in result:
-            new_result.append(tuple([columns[i].cast(item[i]) for i in range(len(columns))]))
-        return new_result
+            new_result.append(SelectData(self._table, item, columns))
+
+        return None if len(new_result) == 0 else new_result[0] if len(new_result) == 1 else new_result
 
 
 class Insert(SQLCommandExecutable):
