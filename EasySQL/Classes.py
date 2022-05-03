@@ -7,7 +7,8 @@ from .Exceptions import MissingArgumentException, MisMatchException, DatabaseSaf
 from .Logging import logger
 from .Where import Where
 
-__all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn', 'Select', 'Insert', 'Update', 'Delete']
+__all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn',
+           'Select', 'Insert', 'Update', 'Delete', 'SelectData']
 
 
 class EasyColumn:
