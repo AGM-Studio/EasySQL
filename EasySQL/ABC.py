@@ -23,7 +23,7 @@ class SQLType:
         self._caster = caster
         self._default = default
 
-        self._parser = parser if parser is not None else str
+        self._parser = parser if parser is not None else lambda value: 'null' if value is None else str(value)
         self._modifiable = modifiable
 
     def __call__(self, *args):
