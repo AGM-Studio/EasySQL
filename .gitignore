@@ -1,3 +1,5 @@
 build
 dist
 test*
+*egg-info
+upload.py

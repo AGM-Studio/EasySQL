@@ -5,14 +5,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="PyEasySQL",
-    version="1.6.0",
+    version="1.6.1",
     license='MIT License',
     author="Ashenguard",
     author_email="Ashenguard@agmdev.xyz",
     description="SQL Database management without even a SQL line",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/ashengaurd/easysql",
+    url="https://github.com/ashenguard/easysql",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -20,7 +20,7 @@ setuptools.setup(
         "Development Status :: 5 - Production/Stable",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.9',
     include_package_data=True,
     install_requires=["mysql-connector"],
 )
