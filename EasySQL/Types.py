@@ -57,8 +57,7 @@ type_dict = {
     INT24: ['mediumint'],
     INT16: ['smallint'],
     INT8: ['tinyint'],
-    BIT: ['bit'],
-    BOOL: ['bool', 'boolean'],
+    BIT: ['bit', 'bool', 'boolean'],
     FLOAT: ['float'],
     DOUBLE: ['double'],
     DEC: ['decimal', 'dec'],
@@ -72,6 +71,8 @@ def string_to_type(string: str):
     string = string[:string.find('(')].lower()
     for key, value in type_dict.items():
         if string in value:
+            if key == BIT and string != 'bit':
+                return BOOL
             if not key.modifiable:
                 return key
             return key(*[int(arg) for arg in args.split(',')])
