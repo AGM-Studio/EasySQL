@@ -240,7 +240,7 @@ class EasyTable:
     def set(self, values: Union[Collection[Any], Dict[Union[EasyColumn, str], Any]], where: Where = None):
         values = self.manage_values(values)
         selection = self.select(values.keys(), where)
-        if selection and len(selection) > 0:
+        if selection:
             self.update(values, where)
         else:
             self.insert(values)
