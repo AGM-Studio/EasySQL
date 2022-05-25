@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="PyEasySQL",
-    version="1.6.3",
+    version="1.6.5",
     license='MIT License',
     author="Ashenguard",
     author_email="Ashenguard@agmdev.xyz",
@@ -20,7 +20,7 @@ setuptools.setup(
         "Development Status :: 5 - Production/Stable",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.9',
+    python_requires='>=3.8',
     include_package_data=True,
     install_requires=["mysql-connector"],
 )

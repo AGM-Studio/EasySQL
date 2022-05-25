@@ -222,7 +222,7 @@ class EasyTable:
 
     def select(self, columns: ListOrSingle[Union[EasyColumn, str]] = None, where: Where = None):
         if columns is not None:
-            if isinstance(columns, str):
+            if isinstance(columns, str) or isinstance(columns, EasyColumn):
                 columns = [columns]
             columns = [self.get_column(column) for column in columns]
 
@@ -271,6 +271,10 @@ class SelectData:
             raise ValueError(f'Unable to find `{column}` in data')
 
         return self._data[col]
+
+    def __next__(self):
+        yield self
+        raise StopIteration
 
     @property
     def data(self):
