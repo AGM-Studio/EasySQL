@@ -272,9 +272,8 @@ class SelectData:
 
         return self._data[col]
 
-    def __next__(self):
-        yield self
-        raise StopIteration
+    def __iter__(self):
+        return iter([self])
 
     @property
     def data(self):
