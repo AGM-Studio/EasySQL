@@ -7,7 +7,7 @@ from .Exceptions import MissingArgumentException, MisMatchException, DatabaseSaf
 from .Logging import logger
 from .Where import Where
 
-__all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn',
+__all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn', 'EasyForeignColumn',
            'Select', 'Insert', 'Update', 'Delete', 'SelectData']
 
 
@@ -48,6 +48,24 @@ class EasyColumn:
 
     def cast(self, value):
         return self.sql_type.cast(value)
+
+
+class EasyForeignColumn(EasyColumn):
+    def __init__(self, name: str, table: 'EasyTable', reference: Union[EasyColumn, str], default: Any = None, not_null: bool = False):
+        column = table.get_column(reference)
+        if column is None:
+            raise MisMatchException(f'Unable to find `{reference}` in the table')
+
+        self.refer_table = table
+        self.refer_column = column
+
+        super().__init__(name, column.sql_type, default, False, not_null, False)
+
+    def __repr__(self):
+        return f'<EasyForeignColumn "{self.name}" reference={self.refer_table.name}({self.refer_column.name})>'
+
+    def get_sql(self):
+        return EasyColumn.get_sql(self) + f' REFERENCES {self.refer_table.name}({self.refer_column.name})'
 
 
 class EasyDatabase:
