@@ -1,14 +1,13 @@
-from typing import List, Optional, Union, Any, Dict
+from itertools import zip_longest
+from typing import List, Optional, Union, Any, Sequence, TypeVar
 
 import mysql.connector
 
-from .ABC import ListOrSingle, SQLCommandExecutable, Collection, SQLType, CHARSET
-from .Exceptions import MissingArgumentException, MisMatchException, DatabaseSafetyException
+from .ABC import SQLType, CHARSET
 from .Logging import logger
 from .Where import Where
 
-__all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn', 'EasyForeignColumn',
-           'Select', 'Insert', 'Update', 'Delete', 'SelectData']
+__all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn', 'EasyForeignColumn']
 
 
 class EasyColumn:
@@ -25,6 +24,9 @@ class EasyColumn:
 
     def __repr__(self):
         return f'<EasyColumn "{self.name}" type={self.sql_type.name}>'
+
+    def __str__(self):
+        return self.name
 
     def __eq__(self, other):
         if isinstance(other, EasyColumn):
@@ -54,7 +56,7 @@ class EasyForeignColumn(EasyColumn):
     def __init__(self, name: str, table: 'EasyTable', reference: Union[EasyColumn, str], default: Any = None, not_null: bool = False):
         column = table.get_column(reference)
         if column is None:
-            raise MisMatchException(f'Unable to find `{reference}` in the table')
+            raise ValueError(f'Unable to find `{reference}` in the table')
 
         self.refer_table = table
         self.refer_column = column
@@ -71,9 +73,9 @@ class EasyForeignColumn(EasyColumn):
 class EasyDatabase:
     def __init__(self, host="127.0.0.1", port=3306, database=None, user="root", password=None, charset: Optional[CHARSET] = None):
         if database is None:
-            raise MissingArgumentException('database argument is required.')
+            raise ValueError('database argument is required.')
         if password is None:
-            raise MissingArgumentException('password is not provided.')
+            raise ValueError('password is not provided.')
         if charset is not None and not isinstance(charset, CHARSET):
             raise TypeError(f'charset must be type of "CHARSET" or "NONE", not "{type(charset)}"')
 
@@ -137,7 +139,7 @@ class EasyDatabase:
     def execute(self, operation, params=(), buffered=False, auto_commit=True):
         cursor = self.buffered_cursor if buffered else self.cursor
 
-        logger.debug(f'SQL command has been requested to be executed:\n\tCommand: "{operation}"\n\tParameters: {params}\n\tCommit: {auto_commit}')
+        logger.debug(f'SQL command has been requested to be executed:\n\tCommand: "{operation}"\n\tParameters: {params}\n\tCommit: {auto_commit}\tBuffered: {buffered}')
         cursor.execute(operation, params)
         if auto_commit:
             self.commit()
@@ -165,6 +167,12 @@ class EasyDatabase:
         return tuple(columns)
 
 
+T = TypeVar('T')
+SOS = Union[T, Sequence[T]]
+ECOS = Union[EasyColumn, str]
+SOS_ECOS = SOS[ECOS]
+
+
 class EasyTable:
     def __init__(self, database: EasyDatabase, name: str, columns: List[EasyColumn], auto_prepare=True):
         self._database = database
@@ -174,26 +182,13 @@ class EasyTable:
         if auto_prepare:
             self.prepare()
 
-    def assert_columns(self, columns):
+    def assert_columns(self, columns: SOS_ECOS) -> Optional[Sequence[EasyColumn]]:
         if columns is None or columns == '*':
-            return
-        for column in columns:
-            if column not in self._columns:
-                raise MisMatchException(f'Column "{column}" is not implemented in this table.')
+            return None
+        if not isinstance(columns, Sequence):
+            columns = (columns, )
 
-    def manage_values(self, values: Union[Collection[Any], Dict[Union[EasyColumn, str], Any]]) -> Dict[EasyColumn, Any]:
-        if isinstance(values, dict):
-            columns = [self.get_column(column) for column in values.keys()]
-            values = list(values.values())
-        else:
-            columns = self._columns
-            values = list(values)
-
-        self.assert_columns(columns)
-        if len(values) != len(columns):
-            raise MisMatchException('Values does not match with columns.')
-
-        return {columns[i]: values[i] for i in range(len(columns))}
+        return tuple(self.get_column(column, force=True) for column in columns)
 
     def prepare(self, alter_columns=True):
         command = f'SHOW TABLES FROM {self._database.name} WHERE Tables_in_{self._database.name} = \'{self._name}\';'
@@ -203,24 +198,24 @@ class EasyTable:
                 command = f"CREATE TABLE IF NOT EXISTS {self._name} ({', '.join([column.get_sql() for column in self._columns])});"
                 self._database.execute(command)
             else:
-                raise MissingArgumentException('Table defnied does not exists, as there is no columns available to create one')
+                raise ValueError('Unable to create the table since columns are not specified.')
         else:
             columns = self._database.describe_table(self)
-            if self._columns and self.columns != columns:
-                lc1 = list(self._columns)
-                lc2 = list(columns)
-                size = max(len(lc1), len(lc2))
-                length = len(str(max(lc1, key=lambda val: len(str(val)))))
-                for i in range(len(lc1), size):
-                    lc1.append("-" * length)
-                for i in range(len(lc2), size):
-                    lc2.append("-" * length)
-
-                logger.warn(f'Columns specified do not match with existing ones:\n\tSpecified:{" " * (length - 10)}\t\tExisting:\n\t' +
-                            '\n\t'.join([f'{lc1[i]}{" " * (length - len(str(lc1[i])))}\t\t{lc2[i]}' for i in range(size)]))
-                raise MisMatchException('Existing table does not match with specified columns.')
-            else:
+            if self._columns is None:
                 self._columns = columns
+            else:
+                c1 = set(self._columns)
+                c2 = set(columns)
+
+                if c1 != c2:
+                    lc1 = [column.__repr__() for column in c1 - c2]
+                    lc2 = [column.__repr__() for column in c2 - c1]
+                    lc = zip_longest(lc1, lc2, "")
+                    length = len(max(lc1, key=lambda col: len(col)))
+
+                    logger.warn(f'Columns specified do not match with existing ones:\n\tProvided:{" " * (length - 10)}\t\tExisting:\n\t' +
+                                '\n\t'.join([f'{lci[0]}{" " * (length - len(str(lci[0])))}\t\t{lci[1]}' for lci in lc]))
+                    raise ValueError('Existing table does not match with specified columns.')
 
     @property
     def columns(self):
@@ -230,213 +225,43 @@ class EasyTable:
     def name(self):
         return self._name
 
-    def get_column(self, target) -> Optional[EasyColumn]:
+    def count_rows(self):
+        return int(self._database.execute(f"SELECT COUNT(*) FROM {self.name};", buffered=True).fetchone()[0])
+
+    def get_column(self, target: Union[ECOS], *, force=False) -> Optional[EasyColumn]:
         if target in self._columns:
             return target
         for column in self._columns:
             if column.name == target:
                 return column
-        return None
 
-    def select(self, columns: ListOrSingle[Union[EasyColumn, str]] = None, where: Where = None):
-        if columns is not None:
-            if isinstance(columns, str) or isinstance(columns, EasyColumn):
-                columns = [columns]
-            columns = [self.get_column(column) for column in columns]
+        if not force:
+            return None
+        raise ValueError(f'"{target}" is not implemented in the table({self.name}).')
 
-        return Select(self._database, columns, self, where).execute()
+    def select(self, columns: SOS_ECOS = None, where: Where = None, limit: int = None, offset: int = None, order: SOS_ECOS = None, descending: bool = False):
+        from .Commands import Select
 
-    def insert(self, values: Union[Collection[Any], Dict[Union[EasyColumn, str], Any]]):
-        return Insert(self._database, self.manage_values(values), self).execute()
+        return Select(self._database, self, self.assert_columns(columns) if columns is not None else None, where, limit, offset, self.assert_columns(order), descending).execute()
 
-    def update(self, values: Union[Collection[Any], Dict[Union[EasyColumn, str], Any]], where: Where = None):
-        return Update(self._database, self.manage_values(values), self, where).execute()
+    def insert(self, columns: SOS_ECOS, values: SOS[Any]):
+        from .Commands import Insert
+
+        return Insert(self._database, self, self.assert_columns(columns) if columns is not None else self._columns, values).execute()
+
+    def update(self, columns: SOS_ECOS, values: SOS[Any], where: Where = None):
+        from .Commands import Update
+
+        return Update(self._database, self, self.assert_columns(columns) if columns is not None else self._columns, values, where).execute()
 
     def delete(self, where: Where = None):
+        from .Commands import Delete
+
         return Delete(self._database, self, where).execute()
 
-    def set(self, values: Union[Collection[Any], Dict[Union[EasyColumn, str], Any]], where: Where = None):
-        values = self.manage_values(values)
-        selection = self.select(values.keys(), where)
+    def set(self, columns: SOS_ECOS, values: SOS[Any], where: Where = None):
+        selection = self.select(columns, where)
         if selection:
-            self.update(values, where)
+            self.update(columns, values, where)
         else:
-            self.insert(values)
-
-
-class SelectData:
-    def __init__(self, table: EasyTable, data_array: Union[tuple, list], columns: Union[tuple, list]):
-        if len(data_array) != len(columns):
-            raise MisMatchException('Data does not match the columns')
-
-        self._table = table
-        self._data = {}
-        for i in range(len(data_array)):
-            col = self._table.get_column(columns[i])
-
-            if col is None:
-                raise MisMatchException(f'Unable to find `{columns[i]}` in the table')
-
-            self._data[col] = col.cast(data_array[i])
-
-    def __repr__(self):
-        return f'<SelectData "{self._table.name}">'
-
-    def get(self, column):
-        col = self._table.get_column(column)
-
-        if col is None or col not in self._data.keys():
-            raise ValueError(f'Unable to find `{column}` in data')
-
-        return self._data[col]
-
-    def __iter__(self):
-        return iter([self])
-
-    @property
-    def data(self):
-        return self._data.copy()
-
-
-class Select(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, columns: Collection[EasyColumn] = None, table: EasyTable = None, where: Where = None):
-        if table and columns:
-            table.assert_columns(columns)
-
-        self._database = database
-        self._table = table
-        self._columns = columns
-        self._where = where
-
-    def _asserts(self):
-        if self._table is None:
-            raise MissingArgumentException('Table is missing.')
-        self._table.assert_columns(self._columns)
-
-    def where(self, where: Where):
-        self._where = self._where or where
-        return self
-
-    def from_table(self, table: EasyTable):
-        self._table = self._table or table
-        return self
-
-    def get_value(self) -> str:
-        self._asserts()
-        columns = ', '.join([column.name for column in self._columns]) if self._columns else '*'
-        return f"SELECT {columns} FROM {self._table.name}" + (f' {self._where.get_value()};' if self._where else ";")
-
-    def execute(self) -> Union[None, SelectData, List[SelectData]]:
-        self._asserts()
-        result = self._database.execute(self.get_value(), auto_commit=False).fetchall()
-        columns = self._columns if self._columns else self._table.columns
-        new_result = []
-        for item in result:
-            new_result.append(SelectData(self._table, item, columns))
-
-        return None if len(new_result) == 0 else new_result[0] if len(new_result) == 1 else new_result
-
-
-class Insert(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, values: Dict[EasyColumn, Any], table: EasyTable = None):
-        if table:
-            table.assert_columns(values.keys())
-
-        self._database = database
-        self._values = values
-        self._table = table
-
-    def _asserts(self):
-        if self._table is None:
-            raise MissingArgumentException('Table is missing.')
-        self._table.assert_columns(self._values.keys())
-
-    def into_table(self, table: EasyTable):
-        self._table = self._table or table
-        return self
-
-    def get_value(self) -> str:
-        self._asserts()
-        columns = ', '.join([column.name for column in self._values.keys()])
-        values = ', '.join([column.parse(value) for column, value in self._values.items()])
-        return f"INSERT INTO {self._table.name} ({columns}) VALUES ({values});"
-
-    def execute(self):
-        self._asserts()
-        command = self.get_value()
-        return self._database.execute(command).lastrowid
-
-
-# noinspection SqlWithoutWhere
-# The asserts will not allow the missing where
-class Update(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, values: Dict[EasyColumn, Any], table: EasyTable = None, where: Where = None):
-        if table:
-            table.assert_columns(values.keys())
-
-        self._database = database
-        self._values = values
-        self._table = table
-        self._where = where
-
-    def _asserts(self, safety: bool = True):
-        if self._table is None:
-            raise MissingArgumentException('Table is missing.')
-        self._table.assert_columns(self._values.keys())
-
-        if self._database.safe and safety:
-            if self._where is None:
-                raise DatabaseSafetyException('Safety Warning: Update without any condition is prohibited.')
-
-    def table(self, table: EasyTable):
-        self._table = self._table or table
-        return self
-
-    def where(self, where: Where):
-        self._where = self._where or where
-        return self
-
-    def get_value(self) -> str:
-        self._asserts(safety=False)
-        columns = ', '.join([column.name for column in self._values.keys()])
-        set_command = ', '.join([f'{column.name} = {column.parse(value)}' for column, value in self._values.items()])
-        return f"UPDATE {self._table.name} SET {set_command}" + f' {self._where.get_value()};' if self._where else ";"
-
-    def execute(self):
-        self._asserts()
-        command = self.get_value()
-        return self._database.execute(command).lastrowid
-
-
-# noinspection SqlWithoutWhere
-# The asserts will not allow the missing where
-class Delete(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, table: EasyTable = None, where: Where = None):
-        self._database = database
-        self._table = table
-        self._where = where
-
-    def _asserts(self, safety: bool = True):
-        if self._table is None:
-            raise MissingArgumentException('Table is missing.')
-
-        if self._database.safe:
-            if self._where is None and safety:
-                raise DatabaseSafetyException('Safety Warning: Delete without any condition is prohibited.')
-
-    def where(self, where: Where):
-        self._where = self._where or where
-        return self
-
-    def from_table(self, table: EasyTable):
-        self._table = self._table or table
-        return self
-
-    def get_value(self) -> str:
-        self._asserts(safety=False)
-        return f"DELETE FROM {self._table.name}" + f' {self._where.get_value()};' if self._where else ";"
-
-    def execute(self):
-        self._asserts()
-        command = self.get_value()
-        return self._database.execute(command).lastrowid
+            self.insert(columns, values)

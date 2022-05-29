@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Union, TypeVar, List, Set, Tuple, Callable, Any
+from typing import Callable, Any
 
 
 class SQLType:
@@ -109,10 +109,8 @@ class SQLCommandExecutable(SQLCommand, ABC):
         raise NotImplementedError
 
 
-# Extra Typings
-T = TypeVar('T')
-Collection = Union[List[T], Set[T], Tuple[T]]
-ListOrSingle = Union[T, Collection[T]]
+def make_collection(value):
+    return value if is_collection(value) else [value]
 
 
 def is_collection(value):
