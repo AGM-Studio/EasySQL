@@ -35,6 +35,17 @@ class SelectData:
         return self._data.copy()
 
 
+class EmptySelectData(SelectData):
+    def __init__(self, table: EasyTable):
+        super().__init__(table, [], [])
+
+    def __iter__(self):
+        return iter([])
+
+    def __repr__(self):
+        return f'<EmptySelectData source="{self._table.name}">'
+
+
 class Select(SQLCommandExecutable):
     def __init__(self, database: EasyDatabase, table: EasyTable = None, columns: Sequence[EasyColumn] = None, where: Where = None, limit: int = None, offset: int = None, order: Iterable[EasyColumn] = None, descending: bool = False):
         self._database = database
@@ -61,9 +72,9 @@ class Select(SQLCommandExecutable):
     def execute(self) -> Union[None, SelectData, List[SelectData]]:
         result = self._database.execute(self.get_value(), auto_commit=False).fetchall()
         columns = self._columns if self._columns else self._table.columns
-        new_result = [SelectData(self._table, item, columns) for item in result]
+        new_result = tuple(SelectData(self._table, item, columns) for item in result)
 
-        return None if len(new_result) == 0 else new_result[0] if len(new_result) == 1 else new_result
+        return EmptySelectData(self._table) if len(new_result) == 0 else new_result[0] if len(new_result) == 1 else new_result
 
 
 class Insert(SQLCommandExecutable):
