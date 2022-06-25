@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="PyEasySQL",
-    version="2.0.0",
+    version="2.0.2",
     license='MIT License',
     author="Ashenguard",
     author_email="Ashenguard@agmdev.xyz",

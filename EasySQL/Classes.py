@@ -239,10 +239,10 @@ class EasyTable:
             return None
         raise ValueError(f'"{target}" is not implemented in the table({self.name}).')
 
-    def select(self, columns: SOS_ECOS = None, where: Where = None, limit: int = None, offset: int = None, order: SOS_ECOS = None, descending: bool = False):
+    def select(self, columns: SOS_ECOS = None, where: Where = None, limit: int = None, offset: int = None, order: SOS_ECOS = None, descending: bool = False, force_one=False):
         from .Commands import Select
 
-        return Select(self._database, self, self.assert_columns(columns) if columns is not None else None, where, limit, offset, self.assert_columns(order), descending).execute()
+        return Select(self._database, self, self.assert_columns(columns) if columns is not None else None, where, limit, offset, self.assert_columns(order), descending, force_one).execute()
 
     def insert(self, columns: SOS_ECOS, values: SOS[Any]):
         from .Commands import Insert

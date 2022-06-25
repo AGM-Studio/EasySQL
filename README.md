@@ -11,7 +11,7 @@ You can find support on our discord server here:
 > Pay us a visit there ✌
 
 ### Wiki
-The official wiki of this library is now available at Github
+The official wiki of this library is now available at GitHub
 > https://github.com/Ashengaurd/EasySQL/wiki
 
 
@@ -24,7 +24,7 @@ To install just use following command
 ```shell
 pip install PyEasySQL
 ```
-This library will have dev/beta builds on the github, to install them you can use
+This library will have dev/beta builds on the GitHub, to install them you can use
 
 ```shell
 pip install --upgrade git+https://github.com/Ashengaurd/EasySQL.git
@@ -72,6 +72,8 @@ specific = table.select(Name, where=EasySQL.WhereIsLike(Name, "Ash%").AND(EasySQ
 ### Giving no column will select all the columns, Also you can use limit, offset and order sorting data
 second = table.select(order=Balance, descending=True, limit=1, offset=1)
 top5 = table.select(order=Balance, descending=True, limit=5)
+### If you want only one result not a sequence of them! It will return a SelectData id A data is found or return None if none is found.
+one = table.select(where=EasySQL.WhereIsEqual(Name, "Ashenguard"), force_one=True)
 
 # The result will be an EmptySelectData if nothing was found, A SelectData if only one was found, Or a tuple of SelectData
 # All 3 of them are iterable, so it is safe to use a `for` loop for any result
@@ -96,3 +98,4 @@ database.remove_safety(confirm=True)
 table.delete()
 ```
 
+[![AdFoc.us Banner](https://adfoc.us/images/banners/728x90-2.gif)](https://adfoc.us/?refid=497244)

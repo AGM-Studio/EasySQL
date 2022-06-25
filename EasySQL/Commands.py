@@ -47,7 +47,7 @@ class EmptySelectData(SelectData):
 
 
 class Select(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, table: EasyTable = None, columns: Sequence[EasyColumn] = None, where: Where = None, limit: int = None, offset: int = None, order: Iterable[EasyColumn] = None, descending: bool = False):
+    def __init__(self, database: EasyDatabase, table: EasyTable = None, columns: Sequence[EasyColumn] = None, where: Where = None, limit: int = None, offset: int = None, order: Iterable[EasyColumn] = None, descending: bool = False, force_one: bool = False):
         self._database = database
         self._table = table
         self._columns = columns
@@ -56,6 +56,7 @@ class Select(SQLCommandExecutable):
         self._offset = offset
         self._order = order
         self._desc = descending
+        self._force_one = force_one
 
     def get_value(self) -> str:
         sql = f"SELECT {', '.join([column.name for column in self._columns]) if self._columns else '*'} FROM {self._table.name}"
@@ -73,6 +74,9 @@ class Select(SQLCommandExecutable):
         result = self._database.execute(self.get_value(), auto_commit=False).fetchall()
         columns = self._columns if self._columns else self._table.columns
         new_result = tuple(SelectData(self._table, item, columns) for item in result)
+
+        if self._force_one:
+            return None if len(new_result) == 0 else new_result[0]
 
         return EmptySelectData(self._table) if len(new_result) == 0 else new_result[0] if len(new_result) == 1 else new_result
 
