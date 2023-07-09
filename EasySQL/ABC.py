@@ -2,6 +2,10 @@ from abc import ABC
 from typing import Callable, Any
 
 
+__all__ = ['SQLType', 'SQLTag', 'SQLCommand', 'SQLCommandExecutable', 'SQLExecutable',
+           'CHARSET', 'make_collection', 'is_collection']
+
+
 class SQLType:
     def __init__(self, name, *args, caster: Callable[[Any], Any] = None, get_caster: Callable[["SQLType"], Callable[[Any], Any]] = None, default: Any = None, parser: Callable[[Any], str] = None, modifiable: bool = False):
         self._name = name
@@ -66,6 +70,11 @@ class SQLType:
     @property
     def modifiable(self):
         return self._modifiable
+
+
+class SQLTag:
+    def __init__(self, value):
+        self.value = value
 
 
 class CHARSET:

@@ -5,15 +5,13 @@
 This library allow you to run SQL Databases without knowing even SQL.  
 This library will create SQL queries and execute them as you request and is very simple to use.
 
-### Support
-You can find support on our discord server here:
-> https://discord.gg/6exsySK  
-> Pay us a visit there ✌
+### Having an issue?
+You can always find someone on our discord server here:
+> https://discord.gg/6exsySK
 
 ### Wiki
 The official wiki of this library is now available at GitHub
-> https://github.com/Ashengaurd/EasySQL/wiki
-
+> https://github.com/Ashenguard/EasySQL/wiki
 
 ## How to install
 ![](https://img.shields.io/github/v/release/Ashengaurd/EasySQL?label=Release&logo=github&style=plastic)
@@ -27,75 +25,80 @@ pip install PyEasySQL
 This library will have dev/beta builds on the GitHub, to install them you can use
 
 ```shell
-pip install --upgrade git+https://github.com/Ashengaurd/EasySQL.git
+pip install --upgrade git+https://github.com/Ashenguard/EasySQL.git
 ```
 ***
 By installing this library following libraries and their dependencies will be installed too.
-> mysql-connector: Which is the basic library for connecting to database
-
+```yaml
+mysql-connector: Which is the basic library for connecting to database
+```
 # Example
 
 ```python
 import EasySQL
 
-# Define database which will be needed by any table you create.
-database = EasySQL.EasyDatabase(host='127.0.0.1', port=3306,
-                                database='DatabaseName',
-                                user='username', password='PASSWORD')
+# Simply provide connection info to your database
+@EasySQL.auto_init
+class MyDatabase(EasySQL.EasyDatabase):
+    _database = 'MyDatabase'
+    _password = '**********'
+    _host = '127.0.0.1'
+    _port = 3306
+    _user = 'root'
 
-# Define tables and columns
-ID = EasySQL.EasyColumn('ID', EasySQL.INT, primary=True, auto_increment=True)
-Name = EasySQL.EasyColumn('Name', EasySQL.STRING(255), not_null=True, default='Missing')
-Balance = EasySQL.EasyColumn('Balance', EasySQL.INT, not_null=True)
-Premium = EasySQL.EasyColumn('Premium', EasySQL.BOOL, not_null=True, default=False)
-
-table = EasySQL.EasyTable(database, 'Users', [ID, Name, Balance, Premium])
+# Simply create a MyTable with its columns!
+@EasySQL.auto_init
+class MyTable(EasySQL.EasyTable, database=MyDatabase, name='MyTable'):
+    ID = EasySQL.EasyColumn('ID', EasySQL.Types.BIGINT, EasySQL.Tags.PRIMARY, EasySQL.Tags.AUTO_INCREMENT)
+    Name = EasySQL.EasyColumn('Name', EasySQL.Types.STRING(255), EasySQL.Tags.NOT_NULL, default='Missing')
+    Balance = EasySQL.EasyColumn('Balance', EasySQL.Types.INT, EasySQL.Tags.NOT_NULL)
+    Premium = EasySQL.EasyColumn('Premium', EasySQL.Types.BOOL, EasySQL.Tags.NOT_NULL, default=False)
 
 # Insert values with a simple command
-table.insert([Name, Premium, Balance], ['Ashenguard', True, 10])
-table.insert([Name, Premium], ['Sam', False])
+MyTable.insert([MyTable.Name, MyTable.Premium, MyTable.Balance], ['Ashenguard', True, 10])
+MyTable.insert([MyTable.Name, MyTable.Premium], ['Sam', False])
 
-# Some random data
+# Let's add some random data 
 from random import randint
 for i in range(5):
-    table.insert([Name, Balance], [f'User-{i}', randint(0, 20)])
+    MyTable.insert(['Name', 'Balance'], [f'User-{i}', randint(0, 20)])
 
 # Selecting data with another simple command
-### Get all the data
-all = table.select()
+### Let's get all the data
+all = MyTable.select()
 ### Something that does not exist
-empty = table.select(ID, where=EasySQL.WhereIsEqual(Name, "NO-ONE"))
+empty = MyTable.select(MyTable.ID, where=EasySQL.WhereIsEqual(MyTable.Name, "NO-ONE"))
 ### To select multiple data give a list of columns as 1st argument
-premiums = table.select([ID, Name], EasySQL.WhereIsEqual(Premium, True))
+premiums = MyTable.select([MyTable.ID, MyTable.Name], EasySQL.WhereIsEqual(MyTable.Premium, True))
 ### You can have more complicated condition with AND (&), OR (|) and NOT (~)
-specific = table.select(Name, where=EasySQL.WhereIsLike(Name, "Ash%").AND(EasySQL.WhereIsLesserEqual(ID, 5)))
-### Giving no column will select all the columns, Also you can use limit, offset and order sorting data
-second = table.select(order=Balance, descending=True, limit=1, offset=1)
-top5 = table.select(order=Balance, descending=True, limit=5)
-### If you want only one result not a sequence of them! It will return a SelectData id A data is found or return None if none is found.
-one = table.select(where=EasySQL.WhereIsEqual(Name, "Ashenguard"), force_one=True)
+specific = MyTable.select(MyTable.Name, where=EasySQL.WhereIsLike(MyTable.Name, "Ash%").AND(EasySQL.WhereIsLesserEqual(MyTable.ID, 5)))
+### Giving no column will select all the columns, Also you can use limit, offset and order to sort data
+second = MyTable.select(order=MyTable.Balance, descending=True, limit=1, offset=1)
+top5 = MyTable.select(order=MyTable.Balance, descending=True, limit=5)
+### If you want only one result not a sequence of them! It will return a SelectData if a data is found or return None if none is found.
+one = MyTable.select(where=EasySQL.WhereIsEqual(MyTable.Name, "Ashenguard"), force_one=True)
 
 # The result will be an EmptySelectData if nothing was found, A SelectData if only one was found, Or a tuple of SelectData
 # All 3 of them are iterable, so it is safe to use a `for` loop for any result
 # To get data from the result you can use `get`, but it only contains columns requested in select method.
 for data in top5:
-    print(f'{data.get(ID)}: {data.get(Name)}\tBalance: {data.get(Balance)}')
+    print(f'{data.get(MyTable.ID)}: {data.get(MyTable.Name)}\tBalance: {data.get(MyTable.Balance)}')
 
 # To delete data just use the delete method
-table.delete(EasySQL.WhereIsGreater(ID, 5))
+MyTable.delete(EasySQL.WhereIsGreater(MyTable.ID, 5))
 
 # Update data with following command
-table.update(Premium, True, EasySQL.WhereIsEqual(ID, 3).OR(EasySQL.WhereIsEqual(Name, 'Sam')))
+MyTable.update(MyTable.Premium, True, EasySQL.WhereIsEqual(MyTable.ID, 3).OR(EasySQL.WhereIsEqual(MyTable.Name, 'Sam')))
 
 # Not sure if you should update or insert? Use set and it will be handled
-table.set([ID, Name, Balance, Premium], [5, 'Nathaniel', 50, False], where=EasySQL.WhereIsEqual(ID, 5))
+MyTable.set([MyTable.ID, MyTable.Name, MyTable.Balance, MyTable.Premium], [5, 'Nathaniel', 50, False], where=EasySQL.WhereIsEqual(MyTable.ID, 5))
 
 # Safety error on delete/update/set without a where statement
-# table.delete() -> raise EasySQL.DatabaseSafetyException
+# MyTable.delete() -> raise EasySQL.DatabaseSafetyException
 # Turn the safety off with following command.
-database.remove_safety(confirm=True)
+MyDatabase.remove_safety(confirm=True)
 # Now there will be no error, it will clean the all data that's why we had safety lock
-table.delete()
+MyTable.delete()
 ```
 
 [![AdFoc.us Banner](https://adfoc.us/images/banners/728x90-2.gif)](https://adfoc.us/?refid=497244)
