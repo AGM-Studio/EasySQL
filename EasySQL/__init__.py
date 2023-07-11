@@ -1,5 +1,4 @@
 from .ABC import *
-from .Characters import *
 from .Classes import *
 from .Where import *
 from .Exceptions import *
@@ -10,3 +9,4 @@ from .Decorators import auto_init
 from . import EasyInstances
 from . import Types
 from . import Tags
+from . import Characters as Charsets
