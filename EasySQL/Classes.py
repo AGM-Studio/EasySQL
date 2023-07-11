@@ -1,6 +1,6 @@
 from itertools import zip_longest
 from time import sleep
-from typing import Optional, Union, Any, Sequence, TypeVar, Tuple
+from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List
 
 import mysql.connector
 
@@ -33,11 +33,12 @@ def _ordinal(i: int):
 
 
 class EasyColumn:
-    def __init__(self, name: str, sql_type: SQLType, *tags: SQLTag, default: Any = None):
+    def __init__(self, name: str, sql_type: SQLType, *tags: SQLTag, default: Any = None, order: int = None):
         self.name = name
         self.sql_type = sql_type
         self.tags = tags
         self.default = default if default else sql_type.default if NOT_NULL in self.tags or PRIMARY in self.tags else None
+        self.order = order
 
         if PRIMARY in self.tags and NOT_NULL in self.tags:
             self.tags = (tag for tag in self.tags if tag != NOT_NULL)
@@ -118,7 +119,7 @@ class EasyDatabase:
     
     def __init_subclass__(cls, **kwargs):
         for key in ('database', 'password', 'host', 'port', 'user', 'charset', 'auto_connect', 'auto_connect_delay'):
-            setattr(cls, f'_{key}', getattr(cls, f'_{key}') or _safe_pop(kwargs, key))
+            setattr(cls, f'_{key}', _safe_pop(kwargs, key) or getattr(cls, f'_{key}'))
 
     def __init__(self, *, _force=False):
         if type(self) == EasyDatabase and not _force:
@@ -255,9 +256,11 @@ class EasyTable:
 
     def __init_subclass__(cls, **kwargs):
         for key in ('database', 'name'):
-            setattr(cls, f'_{key}', getattr(cls, f'_{key}') or _safe_pop(kwargs, key))
+            setattr(cls, f'_{key}', _safe_pop(kwargs, key) or getattr(cls, f'_{key}'))
 
-        cls._columns: Tuple[EasyColumn] = tuple({value for value in cls.__dict__ if isinstance(value, EasyColumn)})
+        columns: List[EasyColumn] = [value for value in cls.__dict__.values() if isinstance(value, EasyColumn)]
+        columns.sort(key=lambda col: col.order if col.order is not None else id(cls))
+        cls._columns: Tuple[EasyColumn] = tuple(columns)
 
     def __init__(self, auto_prepare: bool = True, *, _force=False):
         if type(self) == EasyTable and not _force:
@@ -268,9 +271,6 @@ class EasyTable:
 
         if not isinstance(self._name, str):
             raise TypeError('Version 3: Name is not implemented')
-
-        for column in self._columns:
-            column.set_table(self)
             
         self.__prepared = False
 
@@ -296,7 +296,7 @@ class EasyTable:
                 raise ValueError('No columns where specified and table does not exist')
         else:
             columns = self._database.describe_table(self)
-            if self._columns is None:
+            if self._columns is None or len(self._columns) == 0:
                 self._columns = columns
             else:
                 c1 = set(self._columns)
@@ -313,6 +313,9 @@ class EasyTable:
                     raise ValueError('Existing table does not match with specified columns.')
                 
         self.__prepared = True
+
+        for column in self._columns:
+            column.set_table(self)
 
     @property
     def columns(self):

@@ -67,13 +67,14 @@ type_dict = {
 
 
 def string_to_type(string: str):
-    args = string[string.find('(') + 1:string.rfind(')')]
-    string = string[:string.find('(')].lower()
+    args = string[string.find('(') + 1:string.rfind(')')] if string.find('(') >= 0 else None
+    string = string[:string.find('(')].lower() if string.find('(') >= 0 else string
+
     for key, value in type_dict.items():
         if string in value:
             if key == BIT and string != 'bit':
                 return BOOL
-            if not key.modifiable:
+            if not key.modifiable or args is None:
                 return key
             return key(*[int(arg) for arg in args.split(',')])
     return None
