@@ -30,6 +30,9 @@ class SelectData:
     def __iter__(self):
         return iter([self])
 
+    def __len__(self):
+        return len(self._data.keys())
+
     @property
     def data(self):
         return self._data.copy()
@@ -41,6 +44,9 @@ class EmptySelectData(SelectData):
 
     def __iter__(self):
         return iter([])
+
+    def __len__(self):
+        return 0
 
     def __repr__(self):
         return f'<EmptySelectData source="{self._table.name}">'

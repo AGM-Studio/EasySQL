@@ -84,7 +84,7 @@ class EasyForeignColumn(EasyColumn):
             return TypeError('Version 3: To use this method, The table of column must be set')
 
         tags = (NOT_NULL, ) if NOT_NULL in tags else ()
-        name = f'{column.name} of {column.table}' if name is None else name
+        name = f'{column.name} of {column.table.name}' if name is None else name
         return EasyForeignColumn(name, column.table, column, *tags, default=default)
 
     def __init__(self, name: str, table: 'EasyTable', reference: Union[EasyColumn, str], *tags: SQLTag, default: Any = None):
@@ -369,7 +369,7 @@ class EasyTable:
 
     def set(self, columns: SOS_ECOS, values: SOS[Any], where: Where = None):
         selection = self.select(columns, where)
-        if selection:
+        if selection is not None and len(selection) > 0:
             self.update(columns, values, where)
         else:
             self.insert(columns, values)
