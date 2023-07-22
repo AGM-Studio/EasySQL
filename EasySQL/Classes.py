@@ -372,4 +372,4 @@ class EasyTable:
         if selection is not None and len(selection) > 0:
             self.update(columns, values, where)
         else:
-            self.insert(columns, values)
+            self.insert(self.columns if columns is None or columns == '*' else columns, values)
