@@ -1,15 +1,15 @@
 from abc import ABC
-from typing import Callable, Any
-
+from typing import Callable, Any, Iterable
 
 __all__ = ['SQLType', 'SQLTag', 'SQLCommand', 'SQLCommandExecutable', 'SQLExecutable',
            'CHARSET', 'make_collection', 'is_collection']
 
 
 class SQLType:
-    def __init__(self, name, *args, caster: Callable[[Any], Any] = None, get_caster: Callable[["SQLType"], Callable[[Any], Any]] = None, default: Any = None, parser: Callable[[Any], str] = None, modifiable: bool = False):
+    def __init__(self, name, *args, caster: Callable[[Any], Any] = None, get_caster: Callable[["SQLType"], Callable[[Any], Any]] = None, default: Any = None, parser: Callable[[Any], str] = None, modifiable: bool = False, tags: Iterable[str] = None):
         self._name = name
         self._args = args
+        self._tags = tags or ()
 
         self._modify_args = dict(caster=caster, get_caster=get_caster, default=default, parser=parser)
 
@@ -51,7 +51,11 @@ class SQLType:
 
     @property
     def name(self):
-        return f'{self._name}({",".join([str(arg) for arg in self._args])})' if self._args else self._name
+        name = f'{self._name}({",".join([str(arg) for arg in self._args])})' if self._args else self._name
+        for tag in self._tags:
+            name += f' {tag}'
+
+        return name
 
     def cast(self, value):
         return self._caster(value)

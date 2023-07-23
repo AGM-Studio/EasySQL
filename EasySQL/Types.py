@@ -1,15 +1,19 @@
 from .ABC import SQLType
 
 
-def _get_int_cast_(size):
+def _get_int_cast_(size, unsigned=False):
+    minimum = (-(2 ** (size - 1))) if unsigned else 0
+    maximum = (2 ** (size - 1) - 1) if unsigned else 2 ** size
+
     def cast(value):
         if value is None:
             return None
 
         value = int(value)
-        if value.bit_length() > size:
-            raise ValueError(f'can only accept {size} bits but got {value.bit_length()} bits')
-        return int(value)
+        if not (minimum <= value <= maximum):
+            raise ValueError(f'can only accept between {minimum} and {maximum}, but got {value}')
+
+        return value
 
     return cast
 
@@ -40,6 +44,11 @@ INT32 = INT = INTEGER = SQLType('INT', caster=_get_int_cast_(32), default=0)
 INT24 = MEDIUMINT = SQLType('MEDIUMINT', caster=_get_int_cast_(24), default=0)
 INT16 = SMALLINT = SQLType('SMALLINT', caster=_get_int_cast_(16), default=0)
 INT8 = TINYINT = SQLType('TINYINT', caster=_get_int_cast_(8), default=0)
+
+BIGINT.UNSIGNED = SQLType('BIGINT', caster=_get_int_cast_(64, True), default=0)
+INTEGER.UNSIGNED = SQLType('BIGINT', caster=_get_int_cast_(32, True), default=0)
+MEDIUMINT.UNSIGNED = SQLType('BIGINT', caster=_get_int_cast_(24, True), default=0)
+SMALLINT.UNSIGNED = SQLType('BIGINT', caster=_get_int_cast_(16, True), default=0)
 
 BIT = SQLType('BIT', 1, get_caster=lambda self: _get_int_cast_(self.args[0]), default=0, modifiable=True)
 BOOL = SQLType('BIT', 1, caster=lambda value: None if value is None else True if value else False, default=False, parser=lambda value: '1' if value else '0')
