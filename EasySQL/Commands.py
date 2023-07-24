@@ -88,19 +88,31 @@ class Select(SQLCommandExecutable):
 
 
 class Insert(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, table: EasyTable, columns: Sequence[EasyColumn], values: Sequence[Any]):
-        self._database = database
-        self._columns = columns
-        self._values = values
-        self._table = table
+    def __init__(self, database: EasyDatabase, table: EasyTable, columns: Sequence[EasyColumn], values: Sequence[Any], on_dup_update: bool = True):
+        if columns == '*' or columns is None:
+            columns = table.columns
 
-        if len(self._columns) != len(self._values):
-            raise ValueError('Values length do not match with the columns')
+        table.assert_columns(columns)
+        if len(columns) != len(values):
+            raise ValueError('Values length do not match with the columns of the table')
+
+        self._database = database
+        self._values = zip(table.columns, values)
+        self._columns = columns
+        self._table = table
+        self._update = on_dup_update
 
     def get_value(self) -> str:
         columns = ', '.join([column.name for column in self._columns])
-        values = ', '.join([column.parse(value) for column, value in zip(self._columns, self._values)])
-        return f"INSERT INTO {self._table.name} ({columns}) VALUES ({values});"
+        values = ', '.join([column.parse(value) for column, value in self._values])
+
+        if self._update:
+            extra = ', '.join([f"{column.name}={column.parse(value)}" for column, value in self._values])
+            extra = f" ON DUPLICATE KEY UPDATE {extra}"
+        else:
+            extra = ""
+
+        return f"INSERT INTO {self._table.name} ({columns}) VALUES ({values}){extra};"
 
     def execute(self):
         return self._database.execute(self.get_value(), buffered=True).lastrowid

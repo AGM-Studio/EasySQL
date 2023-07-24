@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import Callable, Any, Iterable
 
-__all__ = ['SQLType', 'SQLTag', 'SQLCommand', 'SQLCommandExecutable', 'SQLExecutable',
+__all__ = ['SQLType', 'SQLConstraints', 'SQLCommand', 'SQLCommandExecutable', 'SQLExecutable',
            'CHARSET', 'make_collection', 'is_collection']
 
 
@@ -76,9 +76,10 @@ class SQLType:
         return self._modifiable
 
 
-class SQLTag:
+class SQLConstraints:
     def __init__(self, value):
         self.value = value
+        self.column_constraint = True
 
 
 class CHARSET:

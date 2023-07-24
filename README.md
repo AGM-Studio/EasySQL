@@ -5,6 +5,8 @@
 This library allow you to run SQL Databases without knowing even SQL.  
 This library will create SQL queries and execute them as you request and is very simple to use.
 
+### This library is still under development, so we appreciate if you help us improve it on the GitHub!
+
 ### Having an issue?
 You can always find someone on our discord server here:
 > https://discord.gg/6exsySK
@@ -45,10 +47,10 @@ class MyDatabase(EasySQL.EasyDatabase):
 # Simply create a MyTable with its columns!
 @EasySQL.auto_init
 class MyTable(EasySQL.EasyTable, database=MyDatabase, name='MyTable'):
-    ID = EasySQL.EasyColumn('ID', EasySQL.Types.BIGINT, EasySQL.Tags.PRIMARY, EasySQL.Tags.AUTO_INCREMENT)
-    Name = EasySQL.EasyColumn('Name', EasySQL.Types.STRING(255), EasySQL.Tags.NOT_NULL, default='Missing')
-    Balance = EasySQL.EasyColumn('Balance', EasySQL.Types.INT, EasySQL.Tags.NOT_NULL)
-    Premium = EasySQL.EasyColumn('Premium', EasySQL.Types.BOOL, EasySQL.Tags.NOT_NULL, default=False)
+    ID = EasySQL.EasyColumn('ID', EasySQL.Types.BIGINT, EasySQL.PRIMARY, EasySQL.AUTO_INCREMENT)
+    Name = EasySQL.EasyColumn('Name', EasySQL.Types.STRING(255), EasySQL.NOT_NULL, default='Missing')
+    Balance = EasySQL.EasyColumn('Balance', EasySQL.Types.INT, EasySQL.NOT_NULL)
+    Premium = EasySQL.EasyColumn('Premium', EasySQL.Types.BOOL, EasySQL.NOT_NULL, default=False)
 
 # Insert values with a simple command
 MyTable.insert([MyTable.Name, MyTable.Premium, MyTable.Balance], ['Ashenguard', True, 10])
@@ -86,8 +88,11 @@ MyTable.delete(EasySQL.WhereIsGreater(MyTable.ID, 5))
 # Update data with following command
 MyTable.update(MyTable.Premium, True, EasySQL.WhereIsEqual(MyTable.ID, 3).OR(EasySQL.WhereIsEqual(MyTable.Name, 'Sam')))
 
-# Not sure if you should update or insert? Use set and it will be handled
-MyTable.set([MyTable.ID, MyTable.Name, MyTable.Balance, MyTable.Premium], [5, 'Nathaniel', 50, False], where=EasySQL.WhereIsEqual(MyTable.ID, 5))
+# Not sure if you should update or insert and don't have primary or unique keys? Use set and it will be handled
+MyTable.set(MyTable.columns, [6, 'Nathaniel', 50, False], where=EasySQL.WhereIsEqual(MyTable.ID, 5))
+
+# And if you have unique and primary keys set let insert handle duplicates for you
+MyTable.insert(MyTable.columns, [3, 'Jack', 5000, False], update_on_dup=True)
 
 # Safety error on delete/update/set without a where statement
 # MyTable.delete() -> raise EasySQL.DatabaseSafetyException
@@ -98,3 +103,14 @@ MyTable.delete()
 ```
 
 [![AdFoc.us Banner](https://adfoc.us/images/banners/728x90-2.gif)](https://adfoc.us/?refid=497244)
+
+## Extras & Features
+1. Need unsigned types? EasySQL has them.
+> `BIGINT.UNSIGNED`, `INT.UNSIGNED`, `MEDIUMINT.UNSIGNED`, `SMALLINT.UNSIGNED`
+2. Afraid of unsigned or signed values? EasySQL will check them for you!
+> Raises `ValueError` if you are out of bound
+3. Multiple primary keys? EasySQL will take care of it.
+> Tag them with `PRIMARY` or add them to `YourTableClass.PRIMARY`
+4. Want to mark multiple columns as unique together? EasySQL have it.
+> Add `Unique(column_1, column_2)` to `YourTableClass.UNIQUES`
+5. 

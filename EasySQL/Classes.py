@@ -3,11 +3,12 @@ from time import sleep
 from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List
 
 import mysql.connector
+from deprecated.classic import deprecated
 
-from .ABC import SQLType, CHARSET, SQLTag
+from .ABC import SQLType, CHARSET, SQLConstraints
 from .Exceptions import DatabaseConnectionException
 from .Logging import logger
-from .Tags import NOT_NULL, PRIMARY
+from .Constraints import NOT_NULL, Unique, UNIQUE, PRIMARY
 from .Where import Where
 
 __all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn', 'EasyForeignColumn']
@@ -33,15 +34,15 @@ def _ordinal(i: int):
 
 
 class EasyColumn:
-    def __init__(self, name: str, sql_type: SQLType, *tags: SQLTag, default: Any = None, order: int = None):
+    def __init__(self, name: str, sql_type: SQLType, *tags: SQLConstraints, default: Any = None, order: int = None):
         self.name = name
         self.sql_type = sql_type
         self.tags = tags
-        self.default = default if default else sql_type.default if NOT_NULL in self.tags or PRIMARY in self.tags else None
+        self.default = default if default else sql_type.default if NOT_NULL in self.tags else None
         self.order = order
 
-        if PRIMARY in self.tags and NOT_NULL in self.tags:
-            self.tags = (tag for tag in self.tags if tag != NOT_NULL)
+        # if PRIMARY in self.tags and NOT_NULL in self.tags:
+        #    self.tags = (tag for tag in self.tags if tag != NOT_NULL)
 
         self.table = None
 
@@ -79,7 +80,7 @@ class EasyColumn:
 
 class EasyForeignColumn(EasyColumn):
     @staticmethod
-    def of(column: EasyColumn, name: str = None, *tags: SQLTag, default: Any = None):
+    def of(column: EasyColumn, name: str = None, *tags: SQLConstraints, default: Any = None):
         if not isinstance(column.table, EasyTable):
             return TypeError('Version 3: To use this method, The table of column must be set')
 
@@ -87,7 +88,7 @@ class EasyForeignColumn(EasyColumn):
         name = f'{column.name} of {column.table.name}' if name is None else name
         return EasyForeignColumn(name, column.table, column, *tags, default=default)
 
-    def __init__(self, name: str, table: 'EasyTable', reference: Union[EasyColumn, str], *tags: SQLTag, default: Any = None):
+    def __init__(self, name: str, table: 'EasyTable', reference: Union[EasyColumn, str], *tags: SQLConstraints, default: Any = None):
         column = table.get_column(reference)
         if column is None:
             raise ValueError(f'Unable to find `{reference}` in the table')
@@ -215,10 +216,11 @@ class EasyDatabase:
                 raise TypeError(f'Unable to recognize name "{column[1]}" as a SQLType')
 
             tags = []
+            prim = []
             if column[2] == 'NO':
                 tags.append(NOT_NULL)
             if column[3] == 'PRI':
-                tags.append(PRIMARY)
+                prim.append(column[0])
 
             columns.append(EasyColumn(column[0], sqltype, *tags, default=column[4]))
 
@@ -254,12 +256,22 @@ class EasyTable:
     _name: str = NotImplemented
     _columns: tuple = ()
 
+    PRIMARY: List[EasyColumn] = []
+    UNIQUES: List[Unique] = []
+
     def __init_subclass__(cls, **kwargs):
         for key in ('database', 'name'):
             setattr(cls, f'_{key}', _safe_pop(kwargs, key) or getattr(cls, f'_{key}'))
 
         columns: List[EasyColumn] = [value for value in cls.__dict__.values() if isinstance(value, EasyColumn)]
-        columns.sort(key=lambda col: col.order if col.order is not None else id(cls))
+        for column in columns:
+            if UNIQUE in column.tags:
+                cls.UNIQUES.append(Unique(column))
+            if PRIMARY in column.tags:
+                cls.PRIMARY.append(column)
+
+            column.tags = tuple([tag for tag in column.tags if tag != UNIQUE and tag != PRIMARY])
+
         cls._columns: Tuple[EasyColumn] = tuple(columns)
 
     def __init__(self, auto_prepare: bool = True, *, _force=False):
@@ -290,7 +302,14 @@ class EasyTable:
         exists = bool(self._database.execute(command, buffered=True).fetchall())
         if not exists:
             if self._columns:
-                command = f"CREATE TABLE IF NOT EXISTS {self._name} ({', '.join([column.get_sql() for column in self._columns])});"
+                command = ', '.join([column.get_sql() for column in self._columns])
+                if len(self.PRIMARY) > 0:
+                    command += f", PRIMARY KEY({', '.join(column.name for column in self.PRIMARY)})"
+
+                for unique in self.UNIQUES:
+                    command += f", {unique.value}"
+
+                command = f"CREATE TABLE {self._name} ({command});"
                 self._database.execute(command)
             else:
                 raise ValueError('No columns where specified and table does not exist')
@@ -349,11 +368,11 @@ class EasyTable:
         assert self.prepared, 'Unable to perform action before preparing the table'
         return Select(self._database, self, self.assert_columns(columns) if columns is not None else None, where, limit, offset, self.assert_columns(order), descending, force_one).execute()
 
-    def insert(self, columns: SOS_ECOS, values: SOS[Any]):
+    def insert(self, columns: SOS_ECOS, values: SOS[Any], update_on_dup: bool = False):
         from .Commands import Insert
 
         assert self.prepared, 'Unable to perform action before preparing the table'
-        return Insert(self._database, self, self.assert_columns(columns) if columns is not None else self._columns, values).execute()
+        return Insert(self._database, self, self.assert_columns(columns) if columns is not None or columns == '*' else self._columns, values, update_on_dup).execute()
 
     def update(self, columns: SOS_ECOS, values: SOS[Any], where: Where = None):
         from .Commands import Update
