@@ -12,7 +12,7 @@ setuptools.setup(
     description="SQL Database management without even a SQL line",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/ashenguard/easysql",
+    url="https://github.com/AGM-Studio/easysql",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

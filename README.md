@@ -11,13 +11,9 @@ You can always find someone on our discord server here:
 
 ### Wiki
 The official wiki of this library is now available at GitHub
-> https://github.com/Ashenguard/EasySQL/wiki
+> https://github.com/AGM-Studio/EasySQL/wiki
 
 ## How to install
-![](https://img.shields.io/github/v/release/Ashengaurd/EasySQL?label=Release&logo=github&style=plastic)
-![](https://img.shields.io/github/last-commit/Ashengaurd/EasySQL/master?label=Date&logo=git&logoColor=blue&style=plastic)  
-![](https://img.shields.io/github/v/release/Ashengaurd/EasySQL?include_prereleases&label=Development&logo=github&style=plastic)
-![](https://img.shields.io/github/last-commit/Ashengaurd/EasySQL?label=Date&logo=git&logoColor=red&style=plastic)  
 To install just use following command
 ```shell
 pip install PyEasySQL
@@ -25,7 +21,7 @@ pip install PyEasySQL
 This library will have dev/beta builds on the GitHub, to install them you can use
 
 ```shell
-pip install --upgrade git+https://github.com/Ashenguard/EasySQL.git
+pip install --upgrade git+https://github.com/AGM-Studio/EasySQL.git
 ```
 ***
 By installing this library following libraries and their dependencies will be installed too.
