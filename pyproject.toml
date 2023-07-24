@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PyEasySQL_Ashenguard"
+version = "3.2.0"
+authors = [
+  { name="Ashenguard", email="ashenguard@agmstudio.xyz" },
+]
+description = "SQL Database management without even a SQL line"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Development Status :: 5 - Production/Stable",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+  "mysql-connector",
+]
+
+
+[project.urls]
+"Homepage" = "https://github.com/agm-studio/easysql"
+"Bug Tracker" = "https://github.com/agm-studio/easysql/issues"
