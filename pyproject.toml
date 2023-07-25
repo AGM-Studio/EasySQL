@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "PyEasySQL_Ashenguard"
-version = "3.2.0"
+name = "pyeasysql_ashenguard"
+version = "3.2.1"
 authors = [
   { name="Ashenguard", email="ashenguard@agmstudio.xyz" },
 ]

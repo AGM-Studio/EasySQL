@@ -18,7 +18,7 @@ class Unique(SQLConstraints):
     Constraint representing unique
     """
 
-    def __init__(self, *columns: EasyColumn, name: str = None):
+    def __init__(self, *columns: 'EasyColumn', name: str = None):
         """
         Unique constractor
 

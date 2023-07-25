@@ -325,7 +325,7 @@ class EasyTable:
                     lc1 = [column.__repr__() for column in c1 - c2]
                     lc2 = [column.__repr__() for column in c2 - c1]
                     lc = zip_longest(lc1, lc2, "")
-                    length = len(max(lc1, key=lambda col: len(col)))
+                    length = len(max(['Provided: '] + lc1, key=lambda col: len(col)))
 
                     logger.warn(f'Columns specified do not match with existing ones:\n\tProvided:{" " * (length - 10)}\t\tExisting:\n\t' +
                                 '\n\t'.join([f'{lci[0]}{" " * (length - len(str(lci[0])))}\t\t{lci[1]}' for lci in lc]))
