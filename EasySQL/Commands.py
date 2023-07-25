@@ -97,7 +97,7 @@ class Insert(SQLCommandExecutable):
             raise ValueError('Values length do not match with the columns of the table')
 
         self._database = database
-        self._values = zip(table.columns, values)
+        self._values = list(zip(table.columns, values))
         self._columns = columns
         self._table = table
         self._update = on_dup_update
