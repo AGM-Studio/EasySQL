@@ -103,7 +103,7 @@ class EasyForeignColumn(EasyColumn):
         return f'<EasyForeignColumn "{self.name}" reference={self.refer_table.name}({self.refer_column.name})>'
 
     def get_sql(self):
-        return EasyColumn.get_sql(self) + f' REFERENCES {self.refer_table.name}({self.refer_column.name})'
+        return EasyColumn.get_sql(self)
 
 
 class EasyDatabase:
@@ -256,12 +256,15 @@ class EasyTable:
     _name: str = NotImplemented
     _columns: tuple = ()
 
-    PRIMARY: List[EasyColumn] = []
-    UNIQUES: List[Unique] = []
+    PRIMARY: List[EasyColumn] = None
+    UNIQUES: List[Unique] = None
 
     def __init_subclass__(cls, **kwargs):
         for key in ('database', 'name'):
             setattr(cls, f'_{key}', _safe_pop(kwargs, key) or getattr(cls, f'_{key}'))
+
+        cls.PRIMARY = []
+        cls.UNIQUES = []
 
         columns: List[EasyColumn] = [value for value in cls.__dict__.values() if isinstance(value, EasyColumn)]
         for column in columns:
@@ -305,6 +308,10 @@ class EasyTable:
                 command = ', '.join([column.get_sql() for column in self._columns])
                 if len(self.PRIMARY) > 0:
                     command += f", PRIMARY KEY({', '.join(column.name for column in self.PRIMARY)})"
+
+                for column in self._columns:
+                    if isinstance(column, EasyForeignColumn):
+                        command += f", FOREIGN KEY ({column.name}) REFERENCES {column.refer_table.name}({column.refer_column.name})"
 
                 for unique in self.UNIQUES:
                     command += f", {unique.value}"
