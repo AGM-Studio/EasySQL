@@ -46,9 +46,9 @@ INT16 = SMALLINT = SQLType('SMALLINT', caster=_get_int_cast_(16), default=0)
 INT8 = TINYINT = SQLType('TINYINT', caster=_get_int_cast_(8), default=0)
 
 BIGINT.UNSIGNED = SQLType('BIGINT', caster=_get_int_cast_(64, True), default=0)
-INTEGER.UNSIGNED = SQLType('BIGINT', caster=_get_int_cast_(32, True), default=0)
-MEDIUMINT.UNSIGNED = SQLType('BIGINT', caster=_get_int_cast_(24, True), default=0)
-SMALLINT.UNSIGNED = SQLType('BIGINT', caster=_get_int_cast_(16, True), default=0)
+INTEGER.UNSIGNED = SQLType('INT', caster=_get_int_cast_(32, True), default=0)
+MEDIUMINT.UNSIGNED = SQLType('MEDIUMINT', caster=_get_int_cast_(24, True), default=0)
+SMALLINT.UNSIGNED = SQLType('SMALLINT', caster=_get_int_cast_(16, True), default=0)
 
 BIT = SQLType('BIT', 1, get_caster=lambda self: _get_int_cast_(self.args[0]), default=0, modifiable=True)
 BOOL = SQLType('BIT', 1, caster=lambda value: None if value is None else True if value else False, default=False, parser=lambda value: '1' if value else '0')
