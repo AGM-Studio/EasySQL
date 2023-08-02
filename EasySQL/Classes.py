@@ -263,8 +263,8 @@ class EasyTable:
         for key in ('database', 'name'):
             setattr(cls, f'_{key}', _safe_pop(kwargs, key) or getattr(cls, f'_{key}'))
 
-        cls.PRIMARY = []
-        cls.UNIQUES = []
+        cls.PRIMARY = [] if cls.PRIMARY is None else cls.PRIMARY
+        cls.UNIQUES = [] if cls.UNIQUES is None else cls.UNIQUES
 
         columns: List[EasyColumn] = [value for value in cls.__dict__.values() if isinstance(value, EasyColumn)]
         for column in columns:
