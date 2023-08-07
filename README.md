@@ -102,7 +102,7 @@ MyDatabase.remove_safety(confirm=True)
 MyTable.delete()
 ```
 
-[![AdFoc.us Banner](https://adfoc.us/images/banners/728x90-2.gif)](https://adfoc.us/?refid=497244)
+[![Advertisement Banner](https://2captcha.com/referral-banners/2captcha/08.gif)](https://2captcha.com/?from=19092307)
 
 ## Extras & Features
 1. Need unsigned types? EasySQL has them.
