@@ -3,12 +3,11 @@ from time import sleep
 from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List
 
 import mysql.connector
-from deprecated.classic import deprecated
 
 from .ABC import SQLType, CHARSET, SQLConstraints
+from .Constraints import NOT_NULL, Unique, UNIQUE, PRIMARY
 from .Exceptions import DatabaseConnectionException
 from .Logging import logger
-from .Constraints import NOT_NULL, Unique, UNIQUE, PRIMARY
 from .Where import Where
 
 __all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn', 'EasyForeignColumn']
@@ -88,13 +87,14 @@ class EasyForeignColumn(EasyColumn):
         name = f'{column.name} of {column.table.name}' if name is None else name
         return EasyForeignColumn(name, column.table, column, *tags, default=default)
 
-    def __init__(self, name: str, table: 'EasyTable', reference: Union[EasyColumn, str], *tags: SQLConstraints, default: Any = None):
+    def __init__(self, name: str, table: 'EasyTable', reference: Union[EasyColumn, str], *tags: SQLConstraints, default: Any = None, cascade: bool = True):
         column = table.get_column(reference)
         if column is None:
             raise ValueError(f'Unable to find `{reference}` in the table')
 
         self.refer_table = table
         self.refer_column = column
+        self.cascade = cascade
 
         tags = (NOT_NULL,) if NOT_NULL in tags else ()
         super().__init__(name, column.sql_type, *tags, default=default)
@@ -312,6 +312,8 @@ class EasyTable:
                 for column in self._columns:
                     if isinstance(column, EasyForeignColumn):
                         command += f", FOREIGN KEY ({column.name}) REFERENCES {column.refer_table.name}({column.refer_column.name})"
+                        if column.cascade:
+                            command += " ON DELETE CASCADE"
 
                 for unique in self.UNIQUES:
                     command += f", {unique.value}"
