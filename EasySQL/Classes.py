@@ -256,15 +256,20 @@ class EasyTable:
     _name: str = NotImplemented
     _columns: tuple = ()
 
+    _charset: CHARSET = None
+
     PRIMARY: List[EasyColumn] = None
     UNIQUES: List[Unique] = None
 
     def __init_subclass__(cls, **kwargs):
-        for key in ('database', 'name'):
+        for key in ('database', 'name', 'charset'):
             setattr(cls, f'_{key}', _safe_pop(kwargs, key) or getattr(cls, f'_{key}'))
 
         cls.PRIMARY = [] if cls.PRIMARY is None else cls.PRIMARY
         cls.UNIQUES = [] if cls.UNIQUES is None else cls.UNIQUES
+
+        if cls._charset is None:
+            cls._charset = cls._database.charset
 
         columns: List[EasyColumn] = [value for value in cls.__dict__.values() if isinstance(value, EasyColumn)]
         for column in columns:
@@ -339,7 +344,9 @@ class EasyTable:
                     logger.warn(f'Columns specified do not match with existing ones:\n\tProvided:{" " * (length - 10)}\t\tExisting:\n\t' +
                                 '\n\t'.join([f'{lci[0]}{" " * (length - len(str(lci[0])))}\t\t{lci[1]}' for lci in lc]))
                     raise ValueError('Existing table does not match with specified columns.')
-                
+
+        self.set_charset(self.charset)
+
         self.__prepared = True
 
         for column in self._columns:
@@ -352,10 +359,32 @@ class EasyTable:
     @property
     def name(self):
         return self._name
+
+    @property
+    def charset(self):
+        return self._charset
     
     @property
     def prepared(self):
         return self.__prepared
+
+    def set_charset(self, charset):
+        if charset is not None:
+            try:
+                try:
+                    command = f'SELECT TABLE_COLLATION FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = \'{self.name}\''
+                    col = self._database.execute(command, auto_commit=False).fetchall()[0]
+                except Exception:
+                    col = None
+
+                if charset.collation != col:
+                    command = f'ALTER TABLE {self._database} CONVERT TO CHARACTER SET = {charset.name} COLLATE = {charset.collation};'
+                    self._database.execute(command)
+
+                self._charset = charset
+
+            except Exception as e:
+                logger.warn(f"Altering the charset of table failed due {e}")
 
     def count_rows(self):
         return int(self._database.execute(f"SELECT COUNT(*) FROM {self.name};", buffered=True).fetchone()[0])
