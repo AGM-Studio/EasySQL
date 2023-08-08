@@ -236,7 +236,7 @@ class EasyDatabase:
                     col, cha = (None, None)
 
                 if charset.name != cha or charset.collation != col:
-                    command = f'ALTER DATABASE {self._database} CHARACTER SET = {charset.name} COLLATE = {charset.collation};'
+                    command = f'ALTER DATABASE {self._database} CHARACTER SET {charset.name} COLLATE {charset.collation};'
                     self.execute(command)
 
                 self._charset = charset
@@ -378,7 +378,7 @@ class EasyTable:
                     col = None
 
                 if charset.collation != col:
-                    command = f'ALTER TABLE {self._database} CONVERT TO CHARACTER SET = {charset.name} COLLATE = {charset.collation};'
+                    command = f'ALTER TABLE {self.name} CONVERT TO CHARACTER SET {charset.name} COLLATE {charset.collation};'
                     self._database.execute(command)
 
                 self._charset = charset
