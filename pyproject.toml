@@ -21,7 +21,6 @@ dependencies = [
   "mysql-connector",
 ]
 
-
 [project.urls]
 "Homepage" = "https://github.com/agm-studio/easysql"
 "Bug Tracker" = "https://github.com/agm-studio/easysql/issues"
