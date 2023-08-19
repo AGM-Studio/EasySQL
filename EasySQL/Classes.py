@@ -142,7 +142,12 @@ class EasyDatabase:
         while self._auto_connect or attempt == 1:
             try:
                 logger.info(f'Attempting to make a connection to database \'{self._database}\' on \'{self._host}\'({_ordinal(attempt)} attempt)')
-                self._connection = mysql.connector.connect(host=self._host, port=self._port, database=self._database, user=self._user, password=self._password)
+                if self.charset is not None:
+                    self._connection = mysql.connector.connect(host=self._host, port=self._port, database=self._database, user=self._user, password=self._password, charset=self._charset.name, collation=self._charset.collation)
+                    self._connection.set_charset_collation(self._charset.name, self._charset.collation)
+                else:
+                    self._connection = mysql.connector.connect(host=self._host, port=self._port, database=self._database, user=self._user, password=self._password)
+
                 if self._connection.is_connected():
                     logger.info(f'Connection was successful')
                     break
