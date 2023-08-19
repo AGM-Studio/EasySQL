@@ -64,6 +64,8 @@ class EasyColumn:
 
     def get_sql(self):
         value = f'{self.name} {self.sql_type.name}'
+        for tag in self.sql_type.tags:
+            value += ' ' + tag
         for tag in self.tags:
             value += ' ' + tag.value
         if self.default is not None:

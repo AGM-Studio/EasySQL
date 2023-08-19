@@ -51,11 +51,11 @@ class SQLType:
 
     @property
     def name(self):
-        name = f'{self._name}({",".join([str(arg) for arg in self._args])})' if self._args else self._name
-        for tag in self._tags:
-            name += f' {tag}'
+        return f'{self._name}({",".join([str(arg) for arg in self._args])})' if self._args else self._name
 
-        return name
+    @property
+    def tags(self):
+        return self.tags
 
     def cast(self, value):
         return self._caster(value)
