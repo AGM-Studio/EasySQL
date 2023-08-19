@@ -1,3 +1,5 @@
+from typing import Callable, Any, Iterable
+
 from .ABC import SQLType
 
 
@@ -39,16 +41,30 @@ def _string_parse(value):
     return f"'{value}'"
 
 
-INT64 = BIGINT = SQLType('BIGINT', caster=_get_int_cast_(64), default=0)
-INT32 = INT = INTEGER = SQLType('INT', caster=_get_int_cast_(32), default=0)
-INT24 = MEDIUMINT = SQLType('MEDIUMINT', caster=_get_int_cast_(24), default=0)
-INT16 = SMALLINT = SQLType('SMALLINT', caster=_get_int_cast_(16), default=0)
-INT8 = TINYINT = SQLType('TINYINT', caster=_get_int_cast_(8), default=0)
+class IntegerSQLType(SQLType):
+    def __init__(self, name, bit_size, default: Any = None, unsigned: bool = False):
+        super().__init__(name, caster=_get_int_cast_(bit_size), default=default)
 
-BIGINT.UNSIGNED = SQLType('BIGINT', caster=_get_int_cast_(64, True), default=0)
-INTEGER.UNSIGNED = SQLType('INT', caster=_get_int_cast_(32, True), default=0)
-MEDIUMINT.UNSIGNED = SQLType('MEDIUMINT', caster=_get_int_cast_(24, True), default=0)
-SMALLINT.UNSIGNED = SQLType('SMALLINT', caster=_get_int_cast_(16, True), default=0)
+        self.bit_size = bit_size
+
+        if unsigned:
+            self._unsigned = SQLType(name, caster=_get_int_cast_(bit_size, True), default=default, tags=['UNSIGNED'])
+        else:
+            self._unsigned = None
+
+    @property
+    def UNSIGNED(self) -> SQLType:
+        if self._unsigned:
+            return self._unsigned
+
+        raise TypeError(f'{self.name} can not support unsigned')
+
+
+INT64 = BIGINT = IntegerSQLType('BIGINT', 64, 0, True)
+INT32 = INT = INTEGER = IntegerSQLType('INT', 32, 0, True)
+INT24 = MEDIUMINT = IntegerSQLType('MEDIUMINT', 24, 0, True)
+INT16 = SMALLINT = IntegerSQLType('SMALLINT', 16, 0, True)
+INT8 = TINYINT = IntegerSQLType('TINYINT', 8, 0, False)
 
 BIT = SQLType('BIT', 1, get_caster=lambda self: _get_int_cast_(self.args[0]), default=0, modifiable=True)
 BOOL = SQLType('BIT', 1, caster=lambda value: None if value is None else True if value else False, default=False, parser=lambda value: '1' if value else '0')
