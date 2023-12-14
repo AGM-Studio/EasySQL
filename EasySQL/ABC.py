@@ -55,7 +55,7 @@ class SQLType:
 
     @property
     def tags(self):
-        return self.tags
+        return self._tags
 
     def cast(self, value):
         return self._caster(value)
