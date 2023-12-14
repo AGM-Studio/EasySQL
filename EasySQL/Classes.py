@@ -45,7 +45,7 @@ class EasyColumn:
 
         self.table = None
 
-    def set_table(self, table):
+    def prepare(self, table):
         self.table = table
 
     def __hash__(self):
@@ -82,24 +82,27 @@ class EasyColumn:
 class EasyForeignColumn(EasyColumn):
     @staticmethod
     def of(column: EasyColumn, name: str = None, *tags: SQLConstraints, default: Any = None):
-        if not isinstance(column.table, EasyTable):
-            return TypeError('Version 3: To use this method, The table of column must be set')
-
         tags = (NOT_NULL, ) if NOT_NULL in tags else ()
         name = f'{column.name} of {column.table.name}' if name is None else name
         return EasyForeignColumn(name, column.table, column, *tags, default=default)
 
-    def __init__(self, name: str, table: 'EasyTable', reference: Union[EasyColumn, str], *tags: SQLConstraints, default: Any = None, cascade: bool = True):
-        column = table.get_column(reference)
-        if column is None:
-            raise ValueError(f'Unable to find `{reference}` in the table')
-
+    def __init__(self, name: str, table: 'EasyTable', reference: EasyColumn, *tags: SQLConstraints, default: Any = None, cascade: bool = True):
         self.refer_table = table
-        self.refer_column = column
+        self.refer_column = reference
         self.cascade = cascade
 
         tags = (NOT_NULL,) if NOT_NULL in tags else ()
-        super().__init__(name, column.sql_type, *tags, default=default)
+        super().__init__(name, reference.sql_type, *tags, default=default)
+
+    def prepare(self, table: 'EasyTable'):
+        super(EasyForeignColumn, self).prepare(table)
+        
+        if self.refer_table is None:
+            self.refer_table = table
+
+        column = self.refer_table.get_column(self.refer_column)
+        if not isinstance(column, EasyColumn):
+            raise ValueError(f"Unable to find column \"{self.refer_column}\" in table \"{self.refer_table}\"")
 
     def __repr__(self):
         return f'<EasyForeignColumn "{self.name}" reference={self.refer_table.name}({self.refer_column.name})>'
@@ -357,7 +360,7 @@ class EasyTable:
         self.__prepared = True
 
         for column in self._columns:
-            column.set_table(self)
+            column.prepare(self)
 
     @property
     def columns(self):
