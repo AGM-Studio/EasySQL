@@ -325,6 +325,8 @@ class EasyTable:
                     command += f", PRIMARY KEY({', '.join(column.name for column in self.PRIMARY)})"
 
                 for column in self._columns:
+                    column.prepare(self)
+
                     if isinstance(column, EasyForeignColumn):
                         command += f", FOREIGN KEY ({column.name}) REFERENCES {column.refer_table.name}({column.refer_column.name})"
                         if column.cascade:
@@ -355,12 +357,12 @@ class EasyTable:
                                 '\n\t'.join([f'{lci[0]}{" " * (length - len(str(lci[0])))}\t\t{lci[1]}' for lci in lc]))
                     raise ValueError('Existing table does not match with specified columns.')
 
+            for column in self._columns:
+                column.prepare(self)
+
         self.set_charset(self.charset)
 
         self.__prepared = True
-
-        for column in self._columns:
-            column.prepare(self)
 
     @property
     def columns(self):
