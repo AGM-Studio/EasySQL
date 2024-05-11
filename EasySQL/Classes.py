@@ -1,12 +1,12 @@
 from itertools import zip_longest
 from time import sleep
-from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List
+from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type, Iterable
 
 import mysql.connector
 
-from .ABC import SQLType, CHARSET, SQLConstraints
+from .ABC import SQLType, CHARSET, SQLConstraints, SQLCommandExecutable
 from .Constraints import NOT_NULL, Unique, UNIQUE, PRIMARY
-from .Exceptions import DatabaseConnectionException
+from .Exceptions import DatabaseConnectionException, DatabaseSafetyException
 from .Logging import logger
 from .Where import Where
 
@@ -30,6 +30,55 @@ def _ordinal(i: int):
     if i % 10 == 3:
         return f'{i}rd'
     return f'{i}th'
+
+
+class SelectData:
+    def __init__(self, table: "EasyTable", data_array: Union[tuple, list], columns: Union[tuple, list]):
+        if len(data_array) != len(columns):
+            raise ValueError('Data does not match the columns')
+
+        columns = table.assert_columns(columns)
+
+        self._table = table
+        self._data = dict(zip(columns, data_array))
+
+    def __repr__(self):
+        return f'<SelectData source="{self._table.name}">'
+
+    def get(self, column):
+        col = self._table.get_column(column)
+
+        if col is None or col not in self._data.keys():
+            raise ValueError(f'Unable to find `{column}` in data')
+
+        return self._data[col]
+
+    def __iter__(self):
+        return iter([self])
+
+    def __len__(self):
+        return len(self._data.keys())
+
+    @property
+    def data(self):
+        return self._data.copy()
+
+
+class EmptySelectData(SelectData):
+    def __init__(self, table: "EasyTable"):
+        super().__init__(table, [], [])
+
+    def __iter__(self):
+        return iter([])
+
+    def __len__(self):
+        return 0
+
+    def __repr__(self):
+        return f'<EmptySelectData source="{self._table.name}">'
+
+
+SD = TypeVar('SD', bound=SelectData)
 
 
 class EasyColumn:
@@ -128,7 +177,7 @@ class EasyDatabase:
             setattr(cls, f'_{key}', _safe_pop(kwargs, key) or getattr(cls, f'_{key}'))
 
     def __init__(self, *, _force=False):
-        if type(self) == EasyDatabase and not _force:
+        if self.__class__ == EasyDatabase and not _force:
             raise TypeError('Version 3: Unable to instance \'EasyDatabase\' directly, Create a subclass')
 
         if self._database is None:
@@ -208,8 +257,7 @@ class EasyDatabase:
     def execute(self, operation, params=(), buffered=False, auto_commit=True):
         cursor = self.buffered_cursor if buffered else self.cursor
 
-        logger.debug(
-            f'SQL command has been requested to be executed:\n\tCommand: "{operation}"\n\tParameters: {params}\n\tCommit: {auto_commit}\tBuffered: {buffered}')
+        logger.debug(f'SQL command has been requested to be executed:\n\tCommand: "{operation}"\n\tParameters: {params}\n\tCommit: {auto_commit}\tBuffered: {buffered}')
         cursor.execute(operation, params)
         if auto_commit:
             self.commit()
@@ -269,6 +317,7 @@ class EasyTable:
     _database: EasyDatabase = NotImplemented
     _name: str = NotImplemented
     _columns: Tuple[EasyColumn, ...] = ()
+    _data_class: Type["SD"] = None
 
     _charset: CHARSET = None
 
@@ -276,7 +325,7 @@ class EasyTable:
     UNIQUES: List[Unique] = None
 
     def __init_subclass__(cls, **kwargs):
-        for key in ('database', 'name', 'charset'):
+        for key in ('database', 'name', 'charset', 'data_class'):
             setattr(cls, f'_{key}', _safe_pop(kwargs, key) or getattr(cls, f'_{key}'))
 
         cls.PRIMARY = [] if cls.PRIMARY is None else cls.PRIMARY
@@ -297,7 +346,7 @@ class EasyTable:
         cls._columns = tuple(columns)
 
     def __init__(self, auto_prepare: bool = True, *, _force=False):
-        if type(self) == EasyTable and not _force:
+        if self.__class__ == EasyTable and not _force:
             raise TypeError('Version 3: Unable to instance \'EasyTable\' directly, Create a subclass')
 
         if not isinstance(self._database, EasyDatabase):
@@ -416,30 +465,19 @@ class EasyTable:
             return None
         raise ValueError(f'"{target}" is not implemented in the table({self.name}).')
 
-    def select(self, columns: SOS_ECOS = None, where: Where = None, limit: int = None, offset: int = None, order: SOS_ECOS = None, descending: bool = False,
-               force_one=False):
-        from .Commands import Select
-
+    def select(self, columns: SOS_ECOS = None, where: Where = None, limit: int = None, offset: int = None, order: SOS_ECOS = None, descending: bool = False, force_one=False):
         assert self.prepared, 'Unable to perform action before preparing the table'
-        return Select(self._database, self, self.assert_columns(columns) if columns is not None else None, where, limit, offset, self.assert_columns(order),
-                      descending, force_one).execute()
+        return Select(self._database, self, self.assert_columns(columns) if columns is not None else None, where, limit, offset, self.assert_columns(order), descending, force_one, self._data_class).execute()
 
     def insert(self, columns: SOS_ECOS, values: SOS[Any], update_on_dup: bool = False):
-        from .Commands import Insert
-
         assert self.prepared, 'Unable to perform action before preparing the table'
-        return Insert(self._database, self, self.assert_columns(columns) if columns is not None or columns == '*' else self._columns, values,
-                      update_on_dup).execute()
+        return Insert(self._database, self, self.assert_columns(columns) if columns is not None or columns == '*' else self._columns, values, update_on_dup).execute()
 
     def update(self, columns: SOS_ECOS, values: SOS[Any], where: Where = None):
-        from .Commands import Update
-
         assert self.prepared, 'Unable to perform action before preparing the table'
         return Update(self._database, self, self.assert_columns(columns) if columns is not None else self._columns, values, where).execute()
 
     def delete(self, where: Where = None):
-        from .Commands import Delete
-
         assert self.prepared, 'Unable to perform action before preparing the table'
         return Delete(self._database, self, where).execute()
 
@@ -449,3 +487,112 @@ class EasyTable:
             self.update(columns, values, where)
         else:
             self.insert(self.columns if columns is None or columns == '*' else columns, values)
+
+
+class Select(SQLCommandExecutable):
+    def __init__(self, database: EasyDatabase, table: EasyTable = None, columns: Sequence[EasyColumn] = None, where: Where = None, limit: int = None, offset: int = None, order: Iterable[EasyColumn] = None, descending: bool = False, force_one: bool = False, cls: Type[SD] = None):
+        self._database = database
+        self._table = table
+        self._columns = columns
+        self._where = where
+        self._limit = limit
+        self._offset = offset
+        self._order = order
+        self._desc = descending
+        self._force_one = force_one
+        self._cls: Type[SD] = cls if cls is not None else SelectData
+
+    def get_value(self) -> str:
+        sql = f"SELECT {', '.join([column.name for column in self._columns]) if self._columns else '*'} FROM {self._table.name}"
+        if isinstance(self._where, Where):
+            sql += f" {self._where.get_value()}"
+        if self._limit is not None:
+            sql += f" LIMIT {self._limit}"
+        if self._offset is not None:
+            sql += f" OFFSET {self._offset}"
+        if self._order is not None:
+            sql += f" ORDER BY {','.join([column.name for column in self._order])}"
+        return sql + ";"
+
+    def execute(self) -> Union[None, SD, List[SD]]:
+        result = self._database.execute(self.get_value(), auto_commit=False).fetchall()
+        columns = self._columns if self._columns else self._table.columns
+        new_result = tuple(self._cls(self._table, item, columns) for item in result)
+
+        if self._force_one:
+            return None if len(new_result) == 0 else new_result[0]
+
+        return EmptySelectData(self._table) if len(new_result) == 0 else new_result[0] if len(new_result) == 1 else new_result
+
+
+class Insert(SQLCommandExecutable):
+    def __init__(self, database: EasyDatabase, table: EasyTable, columns: Sequence[EasyColumn], values: Sequence[Any], on_dup_update: bool = True):
+        if columns == '*' or columns is None:
+            columns = table.columns
+
+        table.assert_columns(columns)
+        if len(columns) != len(values):
+            raise ValueError('Values length do not match with the columns of the table')
+
+        self._database = database
+        self._values = list(zip(table.columns, values))
+        self._columns = columns
+        self._table = table
+        self._update = on_dup_update
+
+    def get_value(self) -> str:
+        columns = ', '.join([column.name for column in self._columns])
+        values = ', '.join([column.parse(value) for column, value in self._values])
+
+        if self._update:
+            extra = ', '.join([f"{column.name}={column.parse(value)}" for column, value in self._values])
+            extra = f" ON DUPLICATE KEY UPDATE {extra}"
+        else:
+            extra = ""
+
+        return f"INSERT INTO {self._table.name} ({columns}) VALUES ({values}){extra};"
+
+    def execute(self):
+        return self._database.execute(self.get_value(), buffered=True).lastrowid
+
+
+# noinspection SqlWithoutWhere
+# The asserts will not allow the missing where
+class Update(SQLCommandExecutable):
+    def __init__(self, database: EasyDatabase, table: EasyTable, columns: Sequence[EasyColumn], values: Sequence[Any], where: Where = None):
+        self._database = database
+        self._columns = columns
+        self._values = values
+        self._table = table
+        self._where = where
+
+        if len(self._columns) != len(self._values):
+            raise ValueError('Values length do not match with the columns')
+
+    def get_value(self) -> str:
+        set_command = ', '.join([f'{column.name} = {column.parse(value)}' for column, value in zip(self._columns, self._values)])
+        return f"UPDATE {self._table.name} SET {set_command}" + f' {self._where.get_value()};' if self._where else ";"
+
+    def execute(self):
+        if self._database.safe and self._where is None:
+            raise DatabaseSafetyException('Update without any condition is prohibited')
+
+        return self._database.execute(self.get_value(), buffered=True).lastrowid
+
+
+# noinspection SqlWithoutWhere
+# The asserts will not allow the missing where
+class Delete(SQLCommandExecutable):
+    def __init__(self, database: EasyDatabase, table: EasyTable = None, where: Where = None):
+        self._database = database
+        self._table = table
+        self._where = where
+
+    def get_value(self) -> str:
+        return f"DELETE FROM {self._table.name}" + f' {self._where.get_value()};' if self._where else ";"
+
+    def execute(self):
+        if self._database.safe and self._where is None:
+            raise DatabaseSafetyException('Update without any condition is prohibited')
+
+        return self._database.execute(self.get_value(), buffered=True).lastrowid
