@@ -82,7 +82,7 @@ class EasyColumn:
 class EasyForeignColumn(EasyColumn):
     @staticmethod
     def of(column: EasyColumn, name: str = None, *tags: SQLConstraints, default: Any = None):
-        tags = (NOT_NULL, ) if NOT_NULL in tags else ()
+        tags = (NOT_NULL,) if NOT_NULL in tags else ()
         name = f'{column.name} of {column.table.name}' if name is None else name
         return EasyForeignColumn(name, column.table, column, *tags, default=default)
 
@@ -96,7 +96,7 @@ class EasyForeignColumn(EasyColumn):
 
     def prepare(self, table: 'EasyTable'):
         super(EasyForeignColumn, self).prepare(table)
-        
+
         if self.refer_table is None:
             self.refer_table = table
 
@@ -122,7 +122,7 @@ class EasyDatabase:
 
     _auto_connect: bool = True
     _auto_connect_delay: int = 5
-    
+
     def __init_subclass__(cls, **kwargs):
         for key in ('database', 'password', 'host', 'port', 'user', 'charset', 'auto_connect', 'auto_connect_delay'):
             setattr(cls, f'_{key}', _safe_pop(kwargs, key) or getattr(cls, f'_{key}'))
@@ -138,6 +138,7 @@ class EasyDatabase:
         if self._charset is not None and not isinstance(self._charset, CHARSET):
             raise TypeError(f'charset must be type of "CHARSET" or "NONE", not "{type(self._charset)}"')
 
+        self._cursor = None
         self._connection = None
         self._safe = True
 
@@ -148,10 +149,12 @@ class EasyDatabase:
             try:
                 logger.info(f'Attempting to make a connection to database \'{self._database}\' on \'{self._host}\'({_ordinal(attempt)} attempt)')
                 if self.charset is not None:
-                    self._connection = mysql.connector.connect(host=self._host, port=self._port, database=self._database, user=self._user, password=self._password, charset=self._charset.name, collation=self._charset.collation)
+                    self._connection = mysql.connector.connect(host=self._host, port=self._port, database=self._database, user=self._user,
+                                                               password=self._password, charset=self._charset.name, collation=self._charset.collation)
                     self._connection.set_charset_collation(self._charset.name, self._charset.collation)
                 else:
-                    self._connection = mysql.connector.connect(host=self._host, port=self._port, database=self._database, user=self._user, password=self._password)
+                    self._connection = mysql.connector.connect(host=self._host, port=self._port, database=self._database, user=self._user,
+                                                               password=self._password)
 
                 if self._connection.is_connected():
                     logger.info(f'Connection was successful')
@@ -205,7 +208,8 @@ class EasyDatabase:
     def execute(self, operation, params=(), buffered=False, auto_commit=True):
         cursor = self.buffered_cursor if buffered else self.cursor
 
-        logger.debug(f'SQL command has been requested to be executed:\n\tCommand: "{operation}"\n\tParameters: {params}\n\tCommit: {auto_commit}\tBuffered: {buffered}')
+        logger.debug(
+            f'SQL command has been requested to be executed:\n\tCommand: "{operation}"\n\tParameters: {params}\n\tCommit: {auto_commit}\tBuffered: {buffered}')
         cursor.execute(operation, params)
         if auto_commit:
             self.commit()
@@ -264,7 +268,7 @@ SOS_ECOS = SOS[ECOS]
 class EasyTable:
     _database: EasyDatabase = NotImplemented
     _name: str = NotImplemented
-    _columns: tuple = ()
+    _columns: Tuple[EasyColumn, ...] = ()
 
     _charset: CHARSET = None
 
@@ -290,18 +294,18 @@ class EasyTable:
 
             column.tags = tuple([tag for tag in column.tags if tag != UNIQUE and tag != PRIMARY])
 
-        cls._columns: Tuple[EasyColumn] = tuple(columns)
+        cls._columns = tuple(columns)
 
     def __init__(self, auto_prepare: bool = True, *, _force=False):
         if type(self) == EasyTable and not _force:
             raise TypeError('Version 3: Unable to instance \'EasyTable\' directly, Create a subclass')
-        
+
         if not isinstance(self._database, EasyDatabase):
             raise TypeError('Version 3: Database is not implemented')
 
         if not isinstance(self._name, str):
             raise TypeError('Version 3: Name is not implemented')
-            
+
         self.__prepared = False
 
         if auto_prepare:
@@ -375,7 +379,7 @@ class EasyTable:
     @property
     def charset(self):
         return self._charset
-    
+
     @property
     def prepared(self):
         return self.__prepared
@@ -412,17 +416,20 @@ class EasyTable:
             return None
         raise ValueError(f'"{target}" is not implemented in the table({self.name}).')
 
-    def select(self, columns: SOS_ECOS = None, where: Where = None, limit: int = None, offset: int = None, order: SOS_ECOS = None, descending: bool = False, force_one=False):
+    def select(self, columns: SOS_ECOS = None, where: Where = None, limit: int = None, offset: int = None, order: SOS_ECOS = None, descending: bool = False,
+               force_one=False):
         from .Commands import Select
 
         assert self.prepared, 'Unable to perform action before preparing the table'
-        return Select(self._database, self, self.assert_columns(columns) if columns is not None else None, where, limit, offset, self.assert_columns(order), descending, force_one).execute()
+        return Select(self._database, self, self.assert_columns(columns) if columns is not None else None, where, limit, offset, self.assert_columns(order),
+                      descending, force_one).execute()
 
     def insert(self, columns: SOS_ECOS, values: SOS[Any], update_on_dup: bool = False):
         from .Commands import Insert
 
         assert self.prepared, 'Unable to perform action before preparing the table'
-        return Insert(self._database, self, self.assert_columns(columns) if columns is not None or columns == '*' else self._columns, values, update_on_dup).execute()
+        return Insert(self._database, self, self.assert_columns(columns) if columns is not None or columns == '*' else self._columns, values,
+                      update_on_dup).execute()
 
     def update(self, columns: SOS_ECOS, values: SOS[Any], where: Where = None):
         from .Commands import Update
