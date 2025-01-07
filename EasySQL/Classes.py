@@ -469,9 +469,9 @@ class EasyTable:
         assert self.prepared, 'Unable to perform action before preparing the table'
         return Select(self._database, self, *columns)
 
-    def insert(self, columns: SOS_ECOS, values: SOS[Any], update_on_dup: bool = False):
+    def insert(self, *values: Any):
         assert self.prepared, 'Unable to perform action before preparing the table'
-        return Insert(self._database, self, self.assert_columns(columns) if columns is not None or columns == '*' else self._columns, values, update_on_dup).execute()
+        return Insert(self._database, self, *values)
 
     def update(self, columns: SOS_ECOS, values: SOS[Any], where: Where = None):
         assert self.prepared, 'Unable to perform action before preparing the table'
@@ -542,34 +542,34 @@ class Select(SQLCommandExecutable):
 
 
 class Insert(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, table: EasyTable, columns: Sequence[EasyColumn], values: Sequence[Any], on_dup_update: bool = True):
-        if columns == '*' or columns is None:
-            columns = table.columns
-
-        table.assert_columns(columns)
-        if len(columns) != len(values):
-            raise ValueError('Values length do not match with the columns of the table')
-
+    def __init__(self, database: EasyDatabase, table: EasyTable, *values: Any):
         self._database = database
-        self._values = list(zip(columns, values))
-        self._columns = columns
         self._table = table
-        self._update = on_dup_update
+        self._columns = table.columns
+        self._values = values
+        self._update = True
 
     def get_value(self) -> str:
-        columns = ', '.join([column.name for column in self._columns])
-        values = ', '.join([column.parse(value) for column, value in self._values])
+        if len(self._columns) != len(self._values):
+            raise ValueError('Values length do not match with the columns of the table')
 
-        if self._update:
-            extra = ', '.join([f"{column.name}={column.parse(value)}" for column, value in self._values])
-            extra = f" ON DUPLICATE KEY UPDATE {extra}"
-        else:
-            extra = ""
+        columns = ', '.join(column.name for column in self._columns)
+        values = ', '.join(column.parse(value) for column, value in zip(self._columns, self._values))
+
+        extra = (
+            f" ON DUPLICATE KEY UPDATE " +
+            ', '.join(f"{column.name}={column.parse(value)}" for column, value in zip(self._columns, self._values))
+            if self._update else ""
+        )
 
         return f"INSERT INTO {self._table.name} ({columns}) VALUES ({values}){extra};"
 
     def execute(self):
         return self._database.execute(self.get_value(), buffered=True).lastrowid
+
+    def into(self, *columns: ECOS) -> "Insert": return self._set(columns=self._table.assert_columns(columns))
+
+    def do_not_update(self) -> "Insert": return self._set(update=False)
 
 
 # noinspection SqlWithoutWhere
