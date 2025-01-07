@@ -1,8 +1,10 @@
 from abc import ABC
-from typing import Callable, Any, Iterable
+from typing import Callable, Any, Iterable, TypeVar
 
 __all__ = ['SQLType', 'SQLConstraints', 'SQLCommand', 'SQLCommandExecutable', 'SQLExecutable',
            'CHARSET', 'make_collection', 'is_collection']
+
+T = TypeVar('T')
 
 
 class SQLType:
@@ -114,6 +116,11 @@ class SQLExecutable(ABC):
 
 
 class SQLCommand(ABC):
+    def _set(self: T, **kwargs) -> T:
+        for key, value in kwargs.items():
+            setattr(self, f"_{key}", value)
+        return self
+
     def get_value(self, *args, **kwargs) -> str:
         raise NotImplementedError
 

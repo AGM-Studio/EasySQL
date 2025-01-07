@@ -465,9 +465,9 @@ class EasyTable:
             return None
         raise ValueError(f'"{target}" is not implemented in the table({self.name}).')
 
-    def select(self, columns: SOS_ECOS = None, where: Where = None, limit: int = None, offset: int = None, order: SOS_ECOS = None, descending: bool = False, force_one=False):
+    def select(self, *columns: ECOS):
         assert self.prepared, 'Unable to perform action before preparing the table'
-        return Select(self._database, self, self.assert_columns(columns) if columns is not None else None, where, limit, offset, self.assert_columns(order), descending, force_one, self._data_class).execute()
+        return Select(self._database, self, *columns)
 
     def insert(self, columns: SOS_ECOS, values: SOS[Any], update_on_dup: bool = False):
         assert self.prepared, 'Unable to perform action before preparing the table'
@@ -490,39 +490,55 @@ class EasyTable:
 
 
 class Select(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, table: EasyTable = None, columns: Sequence[EasyColumn] = None, where: Where = None, limit: int = None, offset: int = None, order: Iterable[EasyColumn] = None, descending: bool = False, force_one: bool = False, cls: Type[SD] = None):
+    def __init__(self, database: EasyDatabase, table: EasyTable, *columns: ECOS):
         self._database = database
         self._table = table
-        self._columns = columns
-        self._where = where
-        self._limit = limit
-        self._offset = offset
-        self._order = order
-        self._desc = descending
-        self._force_one = force_one
-        self._cls: Type[SD] = cls if cls is not None else SelectData
+        self._columns = table.assert_columns(columns)
+        self._where = None
+        self._limit = None
+        self._offset = None
+        self._order = None
+        self._desc = False
+        self._force_one = False
+        self._cls: Type[SD] = SelectData
 
     def get_value(self) -> str:
-        sql = f"SELECT {', '.join([column.name for column in self._columns]) if self._columns else '*'} FROM {self._table.name}"
-        if isinstance(self._where, Where):
-            sql += f" {self._where.get_value()}"
+        parts = [
+            f"SELECT {', '.join([col.name for col in self._columns]) if self._columns else '*'}",
+            f"FROM {self._table.name}",
+        ]
+        if self._where:
+            parts.append(self._where.get_value())
+        if self._order:
+            parts.append(f"ORDER BY {', '.join([col.name for col in self._order])}{' DESC' if self._desc else ''}")
         if self._limit is not None:
-            sql += f" LIMIT {self._limit}"
+            parts.append(f"LIMIT {self._limit}")
         if self._offset is not None:
-            sql += f" OFFSET {self._offset}"
-        if self._order is not None:
-            sql += f" ORDER BY {','.join([column.name for column in self._order])}"
-        return sql + ";"
+            parts.append(f"OFFSET {self._offset}")
+        return " ".join(parts) + ";"
 
     def execute(self) -> Union[None, SD, List[SD]]:
         result = self._database.execute(self.get_value(), auto_commit=False).fetchall()
-        columns = self._columns if self._columns else self._table.columns
-        new_result = tuple(self._cls(self._table, item, columns) for item in result)
+        columns = self._columns or self._table.columns
+        new_result = [self._cls(self._table, item, columns) for item in result]
 
         if self._force_one:
-            return None if len(new_result) == 0 else new_result[0]
+            return new_result[0] if new_result else None
+        return (
+            EmptySelectData(self._table)
+            if not new_result
+            else new_result[0]
+            if len(new_result) == 1
+            else new_result
+        )
 
-        return EmptySelectData(self._table) if len(new_result) == 0 else new_result[0] if len(new_result) == 1 else new_result
+    def where(self, where: Where) -> "Select": return self._set(where=where)
+    def limit(self, limit: int) -> "Select": return self._set(limit=limit)
+    def offset(self, offset: int) -> "Select": return self._set(offset=offset)
+    def order(self, *order: ECOS) -> "Select": return self._set(order=self._table.assert_columns(order))
+    def descending(self) -> "Select": return self._set(desc=True)
+    def just_one(self) -> "Select": return self._set(force_one=True)
+    def typed(self, cls: Type[SD] = None) -> "Select": return self._set(cls=cls or SelectData)
 
 
 class Insert(SQLCommandExecutable):
