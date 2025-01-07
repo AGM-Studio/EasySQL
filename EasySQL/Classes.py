@@ -1,6 +1,6 @@
 from itertools import zip_longest
 from time import sleep
-from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type, Iterable
+from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type
 
 import mysql.connector
 
@@ -473,21 +473,13 @@ class EasyTable:
         assert self.prepared, 'Unable to perform action before preparing the table'
         return Insert(self._database, self, *values)
 
-    def update(self, columns: SOS_ECOS, values: SOS[Any], where: Where = None):
+    def update(self, *columns: ECOS):
         assert self.prepared, 'Unable to perform action before preparing the table'
-        return Update(self._database, self, self.assert_columns(columns) if columns is not None else self._columns, values, where).execute()
+        return Update(self._database, self, *columns)
 
     def delete(self, where: Where = None):
         assert self.prepared, 'Unable to perform action before preparing the table'
-        return Delete(self._database, self, where).execute()
-
-    def set(self, columns: SOS_ECOS, values: SOS[Any], where: Where = None):
-        selection = self.select(columns, where)
-        if selection is not None and len(selection) > 0:
-            self.update(columns, values, where)
-        else:
-            self.insert(self.columns if columns is None or columns == '*' else columns, values)
-
+        return Delete(self._database, self, where)
 
 class Select(SQLCommandExecutable):
     def __init__(self, database: EasyDatabase, table: EasyTable, *columns: ECOS):
@@ -575,17 +567,17 @@ class Insert(SQLCommandExecutable):
 # noinspection SqlWithoutWhere
 # The asserts will not allow the missing where
 class Update(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, table: EasyTable, columns: Sequence[EasyColumn], values: Sequence[Any], where: Where = None):
+    def __init__(self, database: EasyDatabase, table: EasyTable, *columns: ECOS):
         self._database = database
-        self._columns = columns
-        self._values = values
         self._table = table
-        self._where = where
+        self._columns = self._table.assert_columns(columns)
+        self._values = []
+        self._where = None
 
+    def get_value(self) -> str:
         if len(self._columns) != len(self._values):
             raise ValueError('Values length do not match with the columns')
 
-    def get_value(self) -> str:
         set_command = ', '.join([f'{column.name} = {column.parse(value)}' for column, value in zip(self._columns, self._values)])
         return f"UPDATE {self._table.name} SET {set_command}" + f' {self._where.get_value()};' if self._where else ";"
 
@@ -594,6 +586,10 @@ class Update(SQLCommandExecutable):
             raise DatabaseSafetyException('Update without any condition is prohibited')
 
         return self._database.execute(self.get_value(), buffered=True).lastrowid
+
+    def where(self, where: Where) -> "Update": return self._set(where=where)
+
+    def to(self, *values) -> "Update": return self._set(values=values)
 
 
 # noinspection SqlWithoutWhere
@@ -605,10 +601,10 @@ class Delete(SQLCommandExecutable):
         self._where = where
 
     def get_value(self) -> str:
-        return f"DELETE FROM {self._table.name}" + f' {self._where.get_value()};' if self._where else ";"
+        return f"DELETE FROM {self._table.name}" + (f' {self._where.get_value()};' if self._where else ";")
 
     def execute(self):
         if self._database.safe and self._where is None:
-            raise DatabaseSafetyException('Update without any condition is prohibited')
+            raise DatabaseSafetyException('Delete without any condition is prohibited')
 
         return self._database.execute(self.get_value(), buffered=True).lastrowid
