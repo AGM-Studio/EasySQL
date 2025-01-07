@@ -50,7 +50,7 @@ class WhereIsGreater(Where):
 
 class WhereIsGreaterEqual(Where):
     def __init__(self, column, value):
-        super().__init__(f'{column.name} => {column.parse(value)}')
+        super().__init__(f'{column.name} >= {column.parse(value)}')
 
 
 class WhereIsLesser(Where):
@@ -60,7 +60,7 @@ class WhereIsLesser(Where):
 
 class WhereIsLesserEqual(Where):
     def __init__(self, column, value):
-        super().__init__(f'{column.name} =< {column.parse(value)}')
+        super().__init__(f'{column.name} <= {column.parse(value)}')
 
 
 class WhereIsLike(Where):
