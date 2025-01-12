@@ -1,3 +1,4 @@
+import inspect
 from itertools import zip_longest
 from time import sleep
 from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type, Iterable
@@ -10,7 +11,7 @@ from .Exceptions import DatabaseConnectionException, DatabaseSafetyException
 from .Logging import logger
 from .Where import *
 
-__all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn', 'EasyForeignColumn']
+__all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn', 'EasyForeignColumn', 'SQLData', 'EmptySQLData']
 
 
 def _safe_pop(d: dict, k):
@@ -32,7 +33,7 @@ def _ordinal(i: int):
     return f'{i}th'
 
 
-class SelectData:
+class SQLData:
     def __init__(self, table: "EasyTable", data_array: Union[tuple, list], columns: Union[tuple, list]):
         if len(data_array) != len(columns):
             raise ValueError('Data does not match the columns')
@@ -43,7 +44,7 @@ class SelectData:
         self._data = dict(zip(columns, data_array))
 
     def __repr__(self):
-        return f'<SelectData source="{self._table.name}">'
+        return f'<SelectData source="{self._table.name}" values={self._data}>'
 
     def get(self, column):
         col = self._table.get_column(column)
@@ -51,7 +52,7 @@ class SelectData:
         if col is None or col not in self._data.keys():
             raise ValueError(f'Unable to find `{column}` in data')
 
-        return self._data[col]
+        return col.cast(self._data[col])
 
     def __iter__(self):
         return iter([self])
@@ -64,7 +65,7 @@ class SelectData:
         return self._data.copy()
 
 
-class EmptySelectData(SelectData):
+class EmptySQLData(SQLData):
     def __init__(self, table: "EasyTable"):
         super().__init__(table, [], [])
 
@@ -78,7 +79,7 @@ class EmptySelectData(SelectData):
         return f'<EmptySelectData source="{self._table.name}">'
 
 
-SD = TypeVar('SD', bound=SelectData)
+SD = TypeVar('SD', bound=SQLData)
 
 
 class EasyColumn:
@@ -350,6 +351,7 @@ class EasyTable:
     _name: str = NotImplemented
     _columns: Tuple[EasyColumn, ...] = ()
     _data_class: Type[T] = None
+    _data_convertor = None
 
     _charset: CHARSET = None
 
@@ -376,6 +378,23 @@ class EasyTable:
             column.tags = tuple([tag for tag in column.tags if tag != UNIQUE and tag != PRIMARY])
 
         cls._columns = tuple(columns)
+
+        if cls._data_class is not None:
+            if not issubclass(cls._data_class, SQLData):
+                method = getattr(cls._data_class, 'from_sql_data', None)
+                if method:
+                    if not inspect.ismethod(method):
+                        raise TypeError(f'The "from_sql_data" method of data class "{cls._data_class}" must be decorated class method')
+
+                    signature = inspect.signature(method)
+                    if len(signature.parameters.values()) != 1:
+                        raise TypeError(f'The "from_sql_data" method of data class must take only a SQLData')
+
+                    cls._data_convertor = method
+                else:
+                    raise TypeError(f'Data class "{cls._data_class}" must be a subclass of SelectData or has "from_sql_data" class method')
+            else:
+                cls._data_convertor = cls._data_class
 
     def __init__(self, auto_prepare: bool = True, *, _force=False):
         if self.__class__ == EasyTable and not _force:
@@ -499,7 +518,7 @@ class EasyTable:
 
     def select(self, *columns: ECOS):
         assert self.prepared, 'Unable to perform action before preparing the table'
-        return Select(self._database, self, *columns)
+        return Select(self._database, self, *columns).convert_by(self._data_convertor)
 
     def insert(self, *values: Any):
         assert self.prepared, 'Unable to perform action before preparing the table'
@@ -525,7 +544,7 @@ class Select(SQLCommandExecutable):
         self._order = None
         self._desc = False
         self._force_one = False
-        self._cls: Type[SD] = SelectData
+        self._convertor = None
 
     def get_value(self) -> str:
         parts = [
@@ -536,8 +555,9 @@ class Select(SQLCommandExecutable):
             parts.append(self._where.get_value())
         if self._order:
             parts.append(f"ORDER BY {', '.join([col.name for col in self._order])}{' DESC' if self._desc else ''}")
-        if self._limit is not None:
-            parts.append(f"LIMIT {self._limit}")
+        limit = 1 if self._force_one else self._limit
+        if limit is not None:
+            parts.append(f"LIMIT {limit}")
         if self._offset is not None:
             parts.append(f"OFFSET {self._offset}")
         return " ".join(parts) + ";"
@@ -545,12 +565,15 @@ class Select(SQLCommandExecutable):
     def execute(self) -> Union[None, SD, List[SD]]:
         result = self._database.execute(self, auto_commit=False).fetchall()
         columns = self._columns or self._table.columns
-        new_result = [self._cls(self._table, item, columns) for item in result]
+        new_result = [SQLData(self._table, item, columns) for item in result]
+
+        if self._convertor:
+            new_result = [self._convertor(item) for item in new_result]
 
         if self._force_one:
             return new_result[0] if new_result else None
         return (
-            EmptySelectData(self._table)
+            EmptySQLData(self._table)
             if not new_result
             else new_result[0]
             if len(new_result) == 1
@@ -563,7 +586,7 @@ class Select(SQLCommandExecutable):
     def order(self, *order: ECOS) -> "Select": return self._set(order=self._table.assert_columns(order))
     def descending(self) -> "Select": return self._set(desc=True)
     def just_one(self) -> "Select": return self._set(force_one=True)
-    def typed(self, cls: Type[SD] = None) -> "Select": return self._set(cls=cls or SelectData)
+    def convert_by(self, convertor=None) -> "Select": return self._set(convertor=convertor)
 
 
 class Insert(SQLCommandExecutable):
@@ -620,9 +643,11 @@ class Update(SQLCommandExecutable):
 
         return self._database.execute(self, buffered=True).lastrowid
 
-    def where(self, where: Where) -> "Update": return self._set(where=where)
+    def where(self, where: Where) -> "Update":
+        return self._set(where=where)
 
-    def to(self, *values) -> "Update": return self._set(values=values)
+    def to(self, *values) -> "Update":
+        return self._set(values=values)
 
 
 # noinspection SqlWithoutWhere

@@ -134,7 +134,10 @@ class SQLCommandExecutable(SQLCommand, ABC):
     def __del__(self):
         if not self._executed:
             caller_frame = currentframe().f_back
-            logger.warning(f"Command is created without being executed!\n\tLine #{caller_frame.f_lineno}: {caller_frame.f_code.co_filename}")
+            if caller_frame:
+                logger.warning(f"Command is created without being executed!\n\tLine #{caller_frame.f_lineno}: {caller_frame.f_code.co_filename}")
+            else:
+                logger.warning(f"One command is created without being executed!")
 
     def execute(self, *args, **kwargs):
         raise NotImplementedError
