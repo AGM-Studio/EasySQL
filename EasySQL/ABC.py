@@ -1,5 +1,6 @@
 from abc import ABC
 from typing import Callable, Any, Iterable, TypeVar
+from inspect import currentframe
 
 from .Logging import logger
 
@@ -132,7 +133,8 @@ class SQLCommandExecutable(SQLCommand, ABC):
 
     def __del__(self):
         if not self._executed:
-            logger.warning("Command is created without being executed!")
+            caller_frame = currentframe().f_back
+            logger.warning(f"Command is created without being executed!\n\tLine #{caller_frame.f_lineno}: {caller_frame.f_code.co_filename}")
 
     def execute(self, *args, **kwargs):
         raise NotImplementedError
