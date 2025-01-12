@@ -1,6 +1,6 @@
 from itertools import zip_longest
 from time import sleep
-from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type
+from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type, Iterable
 
 import mysql.connector
 
@@ -8,7 +8,7 @@ from .ABC import SQLType, CHARSET, SQLConstraints, SQLCommandExecutable
 from .Constraints import NOT_NULL, Unique, UNIQUE, PRIMARY
 from .Exceptions import DatabaseConnectionException, DatabaseSafetyException
 from .Logging import logger
-from .Where import Where
+from .Where import *
 
 __all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn', 'EasyForeignColumn']
 
@@ -126,6 +126,33 @@ class EasyColumn:
 
     def cast(self, value):
         return self.sql_type.cast(value)
+
+    def is_equal(self, value) -> WhereIsEqual:
+        return WhereIsEqual(self, value)
+
+    def is_not_equal(self, value) -> WhereIsNotEqual:
+        return WhereIsNotEqual(self, value)
+
+    def is_greater(self, value) -> WhereIsGreater:
+        return WhereIsGreater(self, value)
+
+    def is_greater_equal(self, value) -> WhereIsGreaterEqual:
+        return WhereIsGreaterEqual(self, value)
+
+    def is_lesser(self, value) -> WhereIsLesser:
+        return WhereIsLesser(self, value)
+
+    def is_lesser_equal(self, value) -> WhereIsLesserEqual:
+        return WhereIsLesserEqual(self, value)
+
+    def is_like(self, value) -> WhereIsLike:
+        return WhereIsLike(self, value)
+
+    def is_in(self, values: Iterable) -> WhereIsIn:
+        return WhereIsIn(self, values)
+
+    def is_between(self, a, b) -> WhereIsBetween:
+        return WhereIsBetween(self, a, b)
 
 
 class EasyForeignColumn(EasyColumn):
@@ -480,6 +507,7 @@ class EasyTable:
     def delete(self, where: Where = None):
         assert self.prepared, 'Unable to perform action before preparing the table'
         return Delete(self._database, self, where)
+
 
 class Select(SQLCommandExecutable):
     def __init__(self, database: EasyDatabase, table: EasyTable, *columns: ECOS):
