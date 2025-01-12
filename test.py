@@ -1,38 +1,3 @@
-# EasySQL - New System 4.0.0
-![Downloads](https://pepy.tech/badge/pyeasysql)
-![Downloads](https://pepy.tech/badge/pyeasysql/week)
-![Downloads](https://pepy.tech/badge/pyeasysql/month)  
-This library allow you to run SQL Databases without knowing even SQL.  
-This library will create SQL queries and execute them as you request and is very simple to use.
-
-### This library is still under development, so we appreciate if you help us improve it on the GitHub!
-
-### Having an issue?
-You can always find someone on our discord server here:
-> https://discord.gg/6exsySK
-
-### Wiki
-The official wiki of this library is now available at GitHub
-> https://github.com/AGM-Studio/EasySQL/wiki
-
-## How to install
-To install just use following command
-```shell
-pip install PyEasySQL
-```
-This library will have dev/beta builds on the GitHub, to install them you can use
-
-```shell
-pip install --upgrade git+https://github.com/AGM-Studio/EasySQL.git
-```
-***
-By installing this library following libraries and their dependencies will be installed too.
-```yaml
-mysql-connector: Which is the basic library for connecting to database
-```
-# Example
-Link on GitHub: https://github.com/AGM-Studio/EasySQL/blob/master/test.py 
-```python
 import EasySQL
 
 
@@ -141,17 +106,3 @@ class MyAdvancedTable(EasySQL.EasyTable, database=MyDatabase, name='MyTable', da
 MyAdvancedTable.insert(f'Random', randint(0, 20)).into('Name', 'Balance').execute()
 random = MyAdvancedTable.select().just_one().execute()
 print(random, random.name, random.balance, random.premium)
-```
-
-[![Advertisement Banner](https://2captcha.com/referral-banners/2captcha/08.gif)](https://2captcha.com/?from=19092307)
-
-## Extras & Features
-1. Need unsigned types? EasySQL has them.
-> `BIGINT.UNSIGNED`, `INT.UNSIGNED`, `MEDIUMINT.UNSIGNED`, `SMALLINT.UNSIGNED`
-2. Afraid of unsigned or signed values? EasySQL will check them for you!
-> Raises `ValueError` if you are out of bound
-3. Multiple primary keys? EasySQL will take care of it.
-> Tag them with `PRIMARY` or add them to `YourTableClass.PRIMARY`
-4. Want to mark multiple columns as unique together? EasySQL have it.
-> Add `Unique(column_1, column_2)` to `YourTableClass.UNIQUES`
-5. Auto cast data & auto convert to your classes!
