@@ -281,7 +281,12 @@ class EasyDatabase:
     def name(self):
         return self._database
 
-    def execute(self, operation, params=(), buffered=False, auto_commit=True):
+    def execute(self, sql: SQLCommandExecutable, params=(), buffered=False, auto_commit=True):
+        result = self.execute_command(sql.get_value(), params, buffered, auto_commit)
+        setattr(sql, '_executed', True)
+        return result
+
+    def execute_command(self, operation, params=(), buffered=False, auto_commit=True):
         cursor = self.buffered_cursor if buffered else self.cursor
 
         logger.debug(f'SQL command has been requested to be executed:\n\tCommand: "{operation}"\n\tParameters: {params}\n\tCommit: {auto_commit}\tBuffered: {buffered}')
@@ -297,7 +302,7 @@ class EasyDatabase:
     def describe_table(self, table: 'EasyTable'):
         from EasySQL.Types import string_to_type
 
-        result = self.execute(f'DESCRIBE {self.name}.{table.name};', buffered=True).fetchall()
+        result = self.execute_command(f'DESCRIBE {self.name}.{table.name};', buffered=True).fetchall()
         columns = []
         for column in result:
             sqltype = string_to_type(column[1])
@@ -320,13 +325,13 @@ class EasyDatabase:
             try:
                 try:
                     command = f'SELECT DEFAULT_COLLATION_NAME, DEFAULT_CHARACTER_SET_NAME FROM information_schema.SCHEMATA WHERE information_schema.SCHEMATA.SCHEMA_NAME = \'{self.name}\''
-                    col, cha = self.execute(command, auto_commit=False).fetchall()[0]
+                    col, cha = self.execute_command(command, auto_commit=False).fetchall()[0]
                 except Exception:
                     col, cha = (None, None)
 
                 if charset.name != cha or charset.collation != col:
                     command = f'ALTER DATABASE {self._database} CHARACTER SET {charset.name} COLLATE {charset.collation};'
-                    self.execute(command)
+                    self.execute_command(command)
 
                 self._charset = charset
 
@@ -397,7 +402,7 @@ class EasyTable:
 
     def prepare(self, alter_columns=True):
         command = f'SHOW TABLES FROM {self._database.name} WHERE Tables_in_{self._database.name} = \'{self._name}\';'
-        exists = bool(self._database.execute(command, buffered=True).fetchall())
+        exists = bool(self._database.execute_command(command, buffered=True).fetchall())
         if not exists:
             if self._columns:
                 command = ', '.join([column.get_sql() for column in self._columns])
@@ -416,7 +421,7 @@ class EasyTable:
                     command += f", {unique.value}"
 
                 command = f"CREATE TABLE {self._name} ({command});"
-                self._database.execute(command)
+                self._database.execute_command(command)
             else:
                 raise ValueError('No columns where specified and table does not exist')
         else:
@@ -465,13 +470,13 @@ class EasyTable:
             try:
                 try:
                     command = f'SELECT TABLE_COLLATION FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = \'{self.name}\''
-                    col = self._database.execute(command, auto_commit=False).fetchall()[0]
+                    col = self._database.execute_command(command, auto_commit=False).fetchall()[0]
                 except Exception:
                     col = None
 
                 if charset.collation != col:
                     command = f'ALTER TABLE {self.name} CONVERT TO CHARACTER SET {charset.name} COLLATE {charset.collation};'
-                    self._database.execute(command)
+                    self._database.execute_command(command)
 
                 self._charset = charset
 
@@ -479,7 +484,7 @@ class EasyTable:
                 logger.warn(f"Altering the charset of table failed due {e}")
 
     def count_rows(self):
-        return int(self._database.execute(f"SELECT COUNT(*) FROM {self.name};", buffered=True).fetchone()[0])
+        return int(self._database.execute_command(f"SELECT COUNT(*) FROM {self.name};", buffered=True).fetchone()[0])
 
     def get_column(self, target: Union[ECOS], *, force=False) -> Optional[EasyColumn]:
         if target in self._columns:
@@ -538,7 +543,7 @@ class Select(SQLCommandExecutable):
         return " ".join(parts) + ";"
 
     def execute(self) -> Union[None, SD, List[SD]]:
-        result = self._database.execute(self.get_value(), auto_commit=False).fetchall()
+        result = self._database.execute(self, auto_commit=False).fetchall()
         columns = self._columns or self._table.columns
         new_result = [self._cls(self._table, item, columns) for item in result]
 
@@ -585,7 +590,7 @@ class Insert(SQLCommandExecutable):
         return f"INSERT INTO {self._table.name} ({columns}) VALUES ({values}){extra};"
 
     def execute(self):
-        return self._database.execute(self.get_value(), buffered=True).lastrowid
+        return self._database.execute(self, buffered=True).lastrowid
 
     def into(self, *columns: ECOS) -> "Insert": return self._set(columns=self._table.assert_columns(columns))
 
@@ -613,7 +618,7 @@ class Update(SQLCommandExecutable):
         if self._database.safe and self._where is None:
             raise DatabaseSafetyException('Update without any condition is prohibited')
 
-        return self._database.execute(self.get_value(), buffered=True).lastrowid
+        return self._database.execute(self, buffered=True).lastrowid
 
     def where(self, where: Where) -> "Update": return self._set(where=where)
 
@@ -635,4 +640,4 @@ class Delete(SQLCommandExecutable):
         if self._database.safe and self._where is None:
             raise DatabaseSafetyException('Delete without any condition is prohibited')
 
-        return self._database.execute(self.get_value(), buffered=True).lastrowid
+        return self._database.execute(self, buffered=True).lastrowid

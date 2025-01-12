@@ -1,6 +1,8 @@
 from abc import ABC
 from typing import Callable, Any, Iterable, TypeVar
 
+from .Logging import logger
+
 __all__ = ['SQLType', 'SQLConstraints', 'SQLCommand', 'SQLCommandExecutable', 'SQLExecutable',
            'CHARSET', 'make_collection', 'is_collection']
 
@@ -126,6 +128,12 @@ class SQLCommand(ABC):
 
 
 class SQLCommandExecutable(SQLCommand, ABC):
+    _executed = False
+
+    def __del__(self):
+        if not self._executed:
+            logger.warning("Command is created without being executed!")
+
     def execute(self, *args, **kwargs):
         raise NotImplementedError
 
