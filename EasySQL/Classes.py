@@ -175,7 +175,7 @@ class EasyForeignColumn(EasyColumn):
         super(EasyForeignColumn, self).prepare(table)
 
         if self.refer_table is None:
-            self.refer_table = table
+            self.refer_table = self.refer_column.table
 
         column = self.refer_table.get_column(self.refer_column)
         if not isinstance(column, EasyColumn):

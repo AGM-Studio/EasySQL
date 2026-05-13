@@ -1,11 +1,11 @@
-from typing import Callable, Any, Iterable
+from typing import Any
 
 from .ABC import SQLType
 
 
 def _get_int_cast_(size, unsigned=False):
-    minimum = (-(2 ** (size - 1))) if unsigned else 0
-    maximum = (2 ** (size - 1) - 1) if unsigned else 2 ** size
+    minimum = 0 if unsigned else (-(2 ** (size - 1)))
+    maximum = 2 ** size if unsigned else (2 ** (size - 1) - 1)
 
     def cast(value):
         if value is None:
