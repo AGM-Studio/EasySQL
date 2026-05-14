@@ -25,7 +25,5 @@ class Unique(SQLConstraints):
         :param columns: the column or columns for this constraint
         :param name: the name for this constraint
         """
-        if name is None:
-            super().__init__(f'UNIQUE ({", ".join([column.name for column in columns])})')
-        else:
-            super().__init__(f'CONSTRAINT {name} UNIQUE ({", ".join([column.name for column in columns])})')
+        sql = f'UNIQUE ({", ".join([column.name for column in columns])})'
+        super().__init__(f"CONSTRAINT {name} {sql}" if name is not None else sql)

@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Callable, Any, Iterable, TypeVar
+from typing import Callable, Any, Iterable, TypeVar, List, Dict
 from inspect import currentframe
 
 from .Logging import logger
@@ -11,7 +11,8 @@ T = TypeVar('T')
 
 
 class SQLType:
-    def __init__(self, name, *args, caster: Callable[[Any], Any] = None, get_caster: Callable[["SQLType"], Callable[[Any], Any]] = None, default: Any = None, parser: Callable[[Any], str] = None, modifiable: bool = False, tags: Iterable[str] = None):
+    mapping: Dict[str, "SQLType"] = {}
+    def __init__(self, name, *args, other_names: List[str] = None, caster: Callable[[Any], Any] = None, get_caster: Callable[["SQLType"], Callable[[Any], Any]] = None, default: Any = None, parser: Callable[[Any], str] = None, modifiable: bool = False, tags: Iterable[str] = None):
         self._name = name
         self._args = args
         self._tags = tags or ()
@@ -34,6 +35,10 @@ class SQLType:
 
         self._parser = parser if parser is not None else lambda value: 'null' if value is None else str(value)
         self._modifiable = modifiable
+
+        SQLType.mapping[name.lower()] = self
+        for name in other_names or []:
+            SQLType.mapping[name.lower()] = self
 
     def __call__(self, *args):
         if self._modifiable or not args:
@@ -88,11 +93,9 @@ class SQLConstraints:
 
 
 class CHARSET:
-    def __init__(self, name, collation, maxlen=1, description=None):
+    def __init__(self, name, collation):
         self._name = name
-        self.__doc__ = description
         self._collation = collation
-        self._maxlen = maxlen
 
     def __repr__(self):
         return f'<CHARSET "{self._name}">'
@@ -107,10 +110,6 @@ class CHARSET:
     @property
     def collation(self):
         return self._collation
-
-    @property
-    def maxlen(self):
-        return self._maxlen
 
 
 class SQLExecutable(ABC):

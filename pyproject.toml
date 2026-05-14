@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyeasysql"
-version = "4.1.0"
+version = "5.0.0"
 authors = [
   { name="Ashenguard", email="ashenguard@agmstudio.xyz" },
 ]
@@ -18,7 +18,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-  "mysql-connector",
+  "mysql-connector", "colorlog"
 ]
 
 [project.urls]

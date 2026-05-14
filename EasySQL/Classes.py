@@ -7,7 +7,7 @@ import mysql.connector
 
 from .ABC import SQLType, CHARSET, SQLConstraints, SQLCommandExecutable
 from .Constraints import NOT_NULL, Unique, UNIQUE, PRIMARY
-from .Exceptions import DatabaseConnectionException, DatabaseSafetyException
+from .Exceptions import DatabaseConnectionError, DatabaseSafetyException
 from .Logging import logger
 from .Where import *
 
@@ -260,7 +260,7 @@ class EasyDatabase:
             self._connect()
 
         if self._connection is None or not self._connection.is_connected():
-            raise DatabaseConnectionException('Database is not connected')
+            raise DatabaseConnectionError('Database is not connected')
 
         return self._connection
 
