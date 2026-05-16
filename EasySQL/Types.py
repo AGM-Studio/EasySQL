@@ -1,11 +1,8 @@
-from typing import Any, List
-
-from .ABC import SQLType
-
+from typing import Any, List, Dict, Callable, Iterable
 
 __all__ = [
     "INT64", "BIGINT", "INT32", "INT", "INTEGER", "INT24", "MEDIUMINT", "INT16", "SMALLINT", "INT8", "TINYINT",
-    "BIT", "BOOL", "FLOAT", "DOUBLE", "DEC", "DECIMAL", "STRING", "VARCHAR", "CHAR", "string_to_type"
+    "BIT", "BOOL", "FLOAT", "DOUBLE", "DEC", "DECIMAL", "STRING", "VARCHAR", "CHAR", "string_to_type", "SQLType"
 ]
 
 
@@ -45,6 +42,82 @@ def _string_parse(value):
         return 'null'
 
     return f"'{value}'"
+
+
+class SQLType:
+    mapping: Dict[str, "SQLType"] = {}
+    def __init__(self, name, *args, other_names: List[str] = None, caster: Callable[[Any], Any] = None, get_caster: Callable[["SQLType"], Callable[[Any], Any]] = None, default: Any = None, parser: Callable[[Any], str] = None, modifiable: bool = False, tags: Iterable[str] = None):
+        self._name = name
+        self._args = args
+        self._tags = tags or ()
+
+        self._modify_args = dict(caster=caster, get_caster=get_caster, default=default, parser=parser)
+
+        if caster is None and get_caster is not None:
+            caster = get_caster(self)
+
+        if caster is None:
+            raise NotImplementedError('cast method is not implemented')
+
+        try:
+            caster(default)
+        except Exception:
+            raise NotImplementedError('cast method is not implemented correctly')
+
+        self._caster = caster
+        self._default = default
+
+        self._parser = parser if parser is not None else lambda value: 'null' if value is None else str(value)
+        self._modifiable = modifiable
+
+        SQLType.mapping[name.lower()] = self
+        for name in other_names or []:
+            SQLType.mapping[name.lower()] = self
+
+    def __call__(self, *args):
+        if self._modifiable or not args:
+            return SQLType(self._name, *args, **self._modify_args, modifiable=self._modifiable)
+
+        from EasySQL import SQLTypeException
+        raise SQLTypeException('this sql type is not accepting new arguments')
+
+    def __eq__(self, other):
+        try:
+            return other.name == self.name and other.args == self.args
+        except Exception:
+            return False
+
+    def __hash__(self):
+        return hash((self.name, self.args))
+
+    def __repr__(self):
+        return f'<SQLTYPE "{self.name}">'
+
+    @property
+    def name(self):
+        return f'{self._name}({",".join([str(arg) for arg in self._args])})' if self._args else self._name
+
+    @property
+    def tags(self):
+        return self._tags
+
+    def cast(self, value):
+        return self._caster(value)
+
+    def parse(self, value):
+        return self._parser(self.cast(value))
+
+    @property
+    def default(self):
+        return self._default
+
+    @property
+    def args(self):
+        return self._args
+
+    @property
+    def modifiable(self):
+        return self._modifiable
 
 
 class IntegerSQLType(SQLType):

@@ -10,9 +10,10 @@ from .Decorators import auto_init
 from . import EasyInstances
 from . import Types
 from . import Characters as Charsets
+from .Characters import Charset
 
 
-def quick_database(name: str, host: str = "127.0.0.1", port: int = 3306, user: str = "root", password: str = None, charset: CHARSET = None):
+def quick_database(name: str, host: str = "127.0.0.1", port: int = 3306, user: str = "root", password: str = None, charset: Charset = None):
     class QuickDatabase(EasyDatabase):
         _database: str = name
         _password: str = password
@@ -20,7 +21,7 @@ def quick_database(name: str, host: str = "127.0.0.1", port: int = 3306, user: s
         _port: int = port
         _user: str = user
 
-        _charset: CHARSET = charset
+        _charset: Charset = charset
 
     database = QuickDatabase()
     database.__class = QuickDatabase

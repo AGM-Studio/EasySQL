@@ -1,46 +1,64 @@
-from .ABC import CHARSET
-
 # CP
-CP850 = CHARSET('cp850', 'cp850_general_ci')
-CP852 = CHARSET('cp852', 'cp852_general_ci')
-CP866 = CHARSET('cp866', 'cp866_general_ci')
-CP932 = CHARSET('cp932', 'cp932_japanese_ci')
-CP1250 = CHARSET('cp1250', 'cp1250_general_ci')
-CP1251 = CHARSET('cp1251', 'cp1251_general_ci')
-CP1256 = CHARSET('cp1256', 'cp1256_general_ci')
-CP1257 = CHARSET('cp1257', 'cp1257_general_ci')
+class Charset:
+    def __init__(self, name, collation):
+        self._name = name
+        self._collation = collation
+
+    def __repr__(self):
+        return f'<CHARSET "{self._name}">'
+
+    def __str__(self):
+        return self._name
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def collation(self):
+        return self._collation
+
+
+CP850 = Charset('cp850', 'cp850_general_ci')
+CP852 = Charset('cp852', 'cp852_general_ci')
+CP866 = Charset('cp866', 'cp866_general_ci')
+CP932 = Charset('cp932', 'cp932_japanese_ci')
+CP1250 = Charset('cp1250', 'cp1250_general_ci')
+CP1251 = Charset('cp1251', 'cp1251_general_ci')
+CP1256 = Charset('cp1256', 'cp1256_general_ci')
+CP1257 = Charset('cp1257', 'cp1257_general_ci')
 # LATIN
-LATIN1 = CHARSET('latin1', 'latin1_swedish_ci')
-LATIN2 = CHARSET('latin2', 'latin2_general_ci')
-LATIN5 = CHARSET('latin5', 'latin5_turkish_ci')
-LATIN7 = CHARSET('latin7', 'latin7_general_ci')
+LATIN1 = Charset('latin1', 'latin1_swedish_ci')
+LATIN2 = Charset('latin2', 'latin2_general_ci')
+LATIN5 = Charset('latin5', 'latin5_turkish_ci')
+LATIN7 = Charset('latin7', 'latin7_general_ci')
 # UTF
-UTF8 = CHARSET('utf8', 'utf8_general_ci')
-UTF8MB4 = CHARSET('utf8mb4', 'utf8mb4_general_ci')
-UTF16 = CHARSET('utf16', 'utf16_general_ci')
-UTF16LE = CHARSET('utf16le', 'utf16le_general_ci')
-UTF32 = CHARSET('utf32', 'utf32_general_ci')
+UTF8 = Charset('utf8', 'utf8_general_ci')
+UTF8MB4 = Charset('utf8mb4', 'utf8mb4_general_ci')
+UTF16 = Charset('utf16', 'utf16_general_ci')
+UTF16LE = Charset('utf16le', 'utf16le_general_ci')
+UTF32 = Charset('utf32', 'utf32_general_ci')
 # Others
-ARMSCII8 = CHARSET('armscii8', 'armscii8_general_ci')
-ASCII = CHARSET('ascii', 'ascii_general_ci')
-BIG5 = CHARSET('big5', 'big5_chinese_ci')
-BINARY = CHARSET('binary', 'binary')
-DEC8 = CHARSET('dec8', 'dec8_swedish_ci')
-EUCJPMS = CHARSET('eucjpms', 'eucjpms_japanese_ci')
-EUCKR = CHARSET('euckr', 'euckr_korean_ci')
-GB2312 = CHARSET('gb2312', 'gb2312_chinese_ci')
-GBK = CHARSET('gbk', 'gbk_chinese_ci')
-GEOSTD8 = CHARSET('geostd8', 'geostd8_general_ci')
-GREEK = CHARSET('greek', 'greek_general_ci')
-HEBREW = CHARSET('hebrew', 'hebrew_general_ci')
-HP8 = CHARSET('hp8', 'hp8_english_ci')
-KEYBCS2 = CHARSET('keybcs2', 'keybcs2_general_ci')
-KOI8R = CHARSET('koi8r', 'koi8r_general_ci')
-KOI8U = CHARSET('koi8u', 'koi8u_general_ci')
-MACCE = CHARSET('macce', 'macce_general_ci')
-MACROMAN = CHARSET('macroman', 'macroman_general_ci')
-SJIS = CHARSET('sjis', 'sjis_japanese_ci')
-SWE7 = CHARSET('swe7', 'swe7_swedish_ci')
-TIS620 = CHARSET('tis620', 'tis620_thai_ci')
-UCS2 = CHARSET('ucs2', 'ucs2_general_ci')
-UJIS = CHARSET('ujis', 'ujis_japanese_ci')
+ARMSCII8 = Charset('armscii8', 'armscii8_general_ci')
+ASCII = Charset('ascii', 'ascii_general_ci')
+BIG5 = Charset('big5', 'big5_chinese_ci')
+BINARY = Charset('binary', 'binary')
+DEC8 = Charset('dec8', 'dec8_swedish_ci')
+EUCJPMS = Charset('eucjpms', 'eucjpms_japanese_ci')
+EUCKR = Charset('euckr', 'euckr_korean_ci')
+GB2312 = Charset('gb2312', 'gb2312_chinese_ci')
+GBK = Charset('gbk', 'gbk_chinese_ci')
+GEOSTD8 = Charset('geostd8', 'geostd8_general_ci')
+GREEK = Charset('greek', 'greek_general_ci')
+HEBREW = Charset('hebrew', 'hebrew_general_ci')
+HP8 = Charset('hp8', 'hp8_english_ci')
+KEYBCS2 = Charset('keybcs2', 'keybcs2_general_ci')
+KOI8R = Charset('koi8r', 'koi8r_general_ci')
+KOI8U = Charset('koi8u', 'koi8u_general_ci')
+MACCE = Charset('macce', 'macce_general_ci')
+MACROMAN = Charset('macroman', 'macroman_general_ci')
+SJIS = Charset('sjis', 'sjis_japanese_ci')
+SWE7 = Charset('swe7', 'swe7_swedish_ci')
+TIS620 = Charset('tis620', 'tis620_thai_ci')
+UCS2 = Charset('ucs2', 'ucs2_general_ci')
+UJIS = Charset('ujis', 'ujis_japanese_ci')

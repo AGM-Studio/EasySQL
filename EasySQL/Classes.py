@@ -5,8 +5,10 @@ from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type, I
 
 import mysql.connector
 
-from .ABC import SQLType, CHARSET, SQLConstraints, SQLCommandExecutable
-from .Constraints import NOT_NULL, Unique, UNIQUE, PRIMARY
+from .ABC import SQLCommandExecutable
+from . import Charset
+from .Types import SQLType
+from .Constraints import NOT_NULL, Unique, UNIQUE, PRIMARY, SQLConstraints
 from .Exceptions import DatabaseConnectionError, DatabaseSafetyException
 from .Logging import logger
 from .Where import *
@@ -156,7 +158,7 @@ class EasyDatabase:
     _port: int = 3306
     _user: str = "root"
 
-    _charset: CHARSET = None
+    _charset: Charset = None
 
     _auto_connect: bool = True
     _auto_connect_delay: int = 5
@@ -173,7 +175,7 @@ class EasyDatabase:
             raise ValueError('database argument is required.')
         if self._password is None:
             raise ValueError('password is not provided.')
-        if self._charset is not None and not isinstance(self._charset, CHARSET):
+        if self._charset is not None and not isinstance(self._charset, Charset):
             raise TypeError(f'charset must be type of "CHARSET" or "NONE", not "{type(self._charset)}"')
 
         self._cursor = None
@@ -282,7 +284,7 @@ class EasyDatabase:
 
         return tuple(columns)
 
-    def set_charset(self, charset: CHARSET):
+    def set_charset(self, charset: Charset):
         if charset is not None:
             try:
                 try:
@@ -314,7 +316,7 @@ class EasyTable:
     _data_class: Type[T] = None
     _data_convertor = None
 
-    _charset: CHARSET = None
+    _charset: Charset = None
 
     PRIMARY: List[EasyColumn] = None
     UNIQUES: List[Unique] = None

@@ -1,6 +1,6 @@
 from typing import Optional
 
-from .ABC import CHARSET
+from . import Charset
 from .Classes import EasyDatabase, EasyColumn
 from .Types import *
 
@@ -14,7 +14,7 @@ class EasyLocalHost(EasyDatabase):
     _user = "root"
     _password = ""
 
-    def __init__(self, database, charset: Optional[CHARSET]):
+    def __init__(self, database, charset: Optional[Charset]):
         self._database = database
         self._charset = charset if charset is not None else None
 
