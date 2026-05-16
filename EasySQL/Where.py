@@ -1,4 +1,8 @@
+from typing import TYPE_CHECKING, Iterable
+
 from .ABC import SQLCommand
+if TYPE_CHECKING:
+    from .Classes import EasyColumn
 
 
 # noinspection PyPep8Naming
@@ -81,8 +85,38 @@ class WhereIsBetween(Where):
         super().__init__(f"{column.name} = {values}")
 
 
+class WhereAble:
+    def is_equal(self: "EasyColumn", value) -> WhereIsEqual:
+        return WhereIsEqual(self, value)
+
+    def is_not_equal(self: "EasyColumn", value) -> WhereIsNotEqual:
+        return WhereIsNotEqual(self, value)
+
+    def is_greater(self: "EasyColumn", value) -> WhereIsGreater:
+        return WhereIsGreater(self, value)
+
+    def is_greater_equal(self: "EasyColumn", value) -> WhereIsGreaterEqual:
+        return WhereIsGreaterEqual(self, value)
+
+    def is_lesser(self: "EasyColumn", value) -> WhereIsLesser:
+        return WhereIsLesser(self, value)
+
+    def is_lesser_equal(self: "EasyColumn", value) -> WhereIsLesserEqual:
+        return WhereIsLesserEqual(self, value)
+
+    def is_like(self: "EasyColumn", value) -> WhereIsLike:
+        return WhereIsLike(self, value)
+
+    def is_in(self: "EasyColumn", values: Iterable) -> WhereIsIn:
+        return WhereIsIn(self, values)
+
+    def is_between(self: "EasyColumn", a, b) -> WhereIsBetween:
+        return WhereIsBetween(self, a, b)
+
+
 __all__ = [
     "Where", "WhereIsEqual", "WhereIsNotEqual",
     "WhereIsGreater", "WhereIsLesser", "WhereIsGreaterEqual", "WhereIsLesserEqual",
-    "WhereIsLike", "WhereIsIn", "WhereIsBetween"
+    "WhereIsLike", "WhereIsIn", "WhereIsBetween",
+    "WhereAble"
 ]

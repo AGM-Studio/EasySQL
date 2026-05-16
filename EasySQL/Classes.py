@@ -14,13 +14,6 @@ from .Where import *
 __all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn', 'EasyForeignColumn', 'SQLData', 'EmptySQLData']
 
 
-def _safe_pop(d: dict, k):
-    try:
-        return d.pop(k)
-    except KeyError:
-        return None
-
-
 def _ordinal(i: int):
     if 10 < i % 100 < 20:
         return f'{i}th'
@@ -90,9 +83,6 @@ class EasyColumn:
         self.default = default if default else sql_type.default if NOT_NULL in self.tags else None
         self.order = order
 
-        # if PRIMARY in self.tags and NOT_NULL in self.tags:
-        #    self.tags = (tag for tag in self.tags if tag != NOT_NULL)
-
         self.table = None
 
     def prepare(self, table):
@@ -108,9 +98,7 @@ class EasyColumn:
         return self.name
 
     def __eq__(self, other):
-        if isinstance(other, EasyColumn):
-            return self.name == other.name and self.sql_type == other.sql_type
-        return False
+        return isinstance(other, EasyColumn) and self.name == other.name and self.sql_type == other.sql_type
 
     def get_sql(self):
         value = f'{self.name} {self.sql_type.name}'
@@ -127,33 +115,6 @@ class EasyColumn:
 
     def cast(self, value):
         return self.sql_type.cast(value)
-
-    def is_equal(self, value) -> WhereIsEqual:
-        return WhereIsEqual(self, value)
-
-    def is_not_equal(self, value) -> WhereIsNotEqual:
-        return WhereIsNotEqual(self, value)
-
-    def is_greater(self, value) -> WhereIsGreater:
-        return WhereIsGreater(self, value)
-
-    def is_greater_equal(self, value) -> WhereIsGreaterEqual:
-        return WhereIsGreaterEqual(self, value)
-
-    def is_lesser(self, value) -> WhereIsLesser:
-        return WhereIsLesser(self, value)
-
-    def is_lesser_equal(self, value) -> WhereIsLesserEqual:
-        return WhereIsLesserEqual(self, value)
-
-    def is_like(self, value) -> WhereIsLike:
-        return WhereIsLike(self, value)
-
-    def is_in(self, values: Iterable) -> WhereIsIn:
-        return WhereIsIn(self, values)
-
-    def is_between(self, a, b) -> WhereIsBetween:
-        return WhereIsBetween(self, a, b)
 
 
 class EasyForeignColumn(EasyColumn):
@@ -202,7 +163,7 @@ class EasyDatabase:
 
     def __init_subclass__(cls, **kwargs):
         for key in ('database', 'password', 'host', 'port', 'user', 'charset', 'auto_connect', 'auto_connect_delay'):
-            setattr(cls, f'_{key}', _safe_pop(kwargs, key) or getattr(cls, f'_{key}'))
+            setattr(cls, f'_{key}', kwargs.pop(key, None) or getattr(cls, f'_{key}'))
 
     def __init__(self, *, _force=False):
         if self.__class__ == EasyDatabase and not _force:
@@ -360,7 +321,7 @@ class EasyTable:
 
     def __init_subclass__(cls, **kwargs):
         for key in ('database', 'name', 'charset', 'data_class'):
-            setattr(cls, f'_{key}', _safe_pop(kwargs, key) or getattr(cls, f'_{key}'))
+            setattr(cls, f'_{key}', kwargs.pop(key, None) or getattr(cls, f'_{key}'))
 
         cls.PRIMARY = [] if cls.PRIMARY is None else cls.PRIMARY
         cls.UNIQUES = [] if cls.UNIQUES is None else cls.UNIQUES
