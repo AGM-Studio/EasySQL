@@ -1,6 +1,7 @@
 from typing import Type, TypeVar, Union
 
-from .Classes import EasyTable, EasyDatabase
+from .Classes import EasyTable
+from . import EasyDatabase
 
 __all__ = ['auto_init']
 

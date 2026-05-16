@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .Classes import EasyColumn
 
-__all__ = ['PRIMARY', 'NOT_NULL', 'AUTO_INCREMENT', 'UNIQUE', 'Unique']
+__all__ = ['PRIMARY', 'NOT_NULL', 'AUTO_INCREMENT', 'UNIQUE', 'Unique', 'SQLConstraints']
 
 
 class SQLConstraints:

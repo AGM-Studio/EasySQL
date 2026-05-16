@@ -1,31 +1,17 @@
 import inspect
 from itertools import zip_longest
-from time import sleep
-from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type, Iterable
+from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type
 
-import mysql.connector
-
+from . import EasyDatabase
 from .ABC import SQLCommandExecutable
-from . import Charset
-from .Types import SQLType
+from .Characters import Charset
 from .Constraints import NOT_NULL, Unique, UNIQUE, PRIMARY, SQLConstraints
-from .Exceptions import DatabaseConnectionError, DatabaseSafetyException
+from .Exceptions import DatabaseSafetyException
 from .Logging import logger
-from .Where import *
+from .Types import SQLType
+from .Where import WhereAble, Where
 
-__all__ = ['EasyDatabase', 'EasyTable', 'EasyColumn', 'EasyForeignColumn', 'SQLData', 'EmptySQLData']
-
-
-def _ordinal(i: int):
-    if 10 < i % 100 < 20:
-        return f'{i}th'
-    if i % 10 == 1:
-        return f'{i}st'
-    if i % 10 == 2:
-        return f'{i}nd'
-    if i % 10 == 3:
-        return f'{i}rd'
-    return f'{i}th'
+__all__ = ['EasyTable', 'EasyColumn', 'EasyForeignColumn', 'SQLData', 'EmptySQLData']
 
 
 class SQLData:
@@ -77,7 +63,7 @@ class EmptySQLData(SQLData):
 SD = TypeVar('SD', bound=SQLData)
 
 
-class EasyColumn:
+class EasyColumn(WhereAble):
     def __init__(self, name: str, sql_type: SQLType, *tags: SQLConstraints, default: Any = None, order: int = None):
         self.name = name
         self.sql_type = sql_type
@@ -149,158 +135,6 @@ class EasyForeignColumn(EasyColumn):
 
     def get_sql(self):
         return EasyColumn.get_sql(self)
-
-
-class EasyDatabase:
-    _database: str = None
-    _password: str = None
-    _host: str = "127.0.0.1"
-    _port: int = 3306
-    _user: str = "root"
-
-    _charset: Charset = None
-
-    _auto_connect: bool = True
-    _auto_connect_delay: int = 5
-
-    def __init_subclass__(cls, **kwargs):
-        for key in ('database', 'password', 'host', 'port', 'user', 'charset', 'auto_connect', 'auto_connect_delay'):
-            setattr(cls, f'_{key}', kwargs.pop(key, None) or getattr(cls, f'_{key}'))
-
-    def __init__(self, *, _force=False):
-        if self.__class__ == EasyDatabase and not _force:
-            raise TypeError('Version 3: Unable to instance \'EasyDatabase\' directly, Create a subclass')
-
-        if self._database is None:
-            raise ValueError('database argument is required.')
-        if self._password is None:
-            raise ValueError('password is not provided.')
-        if self._charset is not None and not isinstance(self._charset, Charset):
-            raise TypeError(f'charset must be type of "CHARSET" or "NONE", not "{type(self._charset)}"')
-
-        self._cursor = None
-        self._connection = None
-        self._safe = True
-
-        self.set_charset(self._charset)
-
-    def _connect(self, *, attempt=1):
-        while self._auto_connect or attempt == 1:
-            try:
-                logger.info(f'Attempting to make a connection to database \'{self._database}\' on \'{self._host}\'({_ordinal(attempt)} attempt)')
-                if self.charset is not None:
-                    self._connection = mysql.connector.connect(host=self._host, port=self._port, database=self._database, user=self._user,
-                                                               password=self._password, charset=self._charset.name, collation=self._charset.collation)
-                    self._connection.set_charset_collation(self._charset.name, self._charset.collation)
-                else:
-                    self._connection = mysql.connector.connect(host=self._host, port=self._port, database=self._database, user=self._user,
-                                                               password=self._password)
-
-                if self._connection.is_connected():
-                    logger.info(f'Connection was successful')
-                    break
-                else:
-                    raise Exception('unknown reason...')
-
-            except Exception as e:
-                logger.warn(f'Connection failed due {e}')
-
-                if self._auto_connect:
-                    sleep(self._auto_connect_delay)
-            finally:
-                attempt += 1
-
-    @property
-    def safe(self):
-        return self._safe
-
-    def remove_safety(self, *, confirm: bool):
-        self._safe = not confirm
-
-    @property
-    def connection(self):
-        if self._connection is None or not self._connection.is_connected():
-            self._connect()
-
-        if self._connection is None or not self._connection.is_connected():
-            raise DatabaseConnectionError('Database is not connected')
-
-        return self._connection
-
-    @property
-    def cursor(self):
-        self._cursor = self.connection.cursor()
-        return self._cursor
-
-    @property
-    def buffered_cursor(self):
-        self._cursor = self.connection.cursor(buffered=True)
-        return self._cursor
-
-    @property
-    def charset(self):
-        return self._charset
-
-    @property
-    def name(self):
-        return self._database
-
-    def execute(self, sql: SQLCommandExecutable, params=(), buffered=False, auto_commit=True):
-        result = self.execute_command(sql.get_value(), params, buffered, auto_commit)
-        setattr(sql, '_executed', True)
-        return result
-
-    def execute_command(self, operation, params=(), buffered=False, auto_commit=True):
-        cursor = self.buffered_cursor if buffered else self.cursor
-
-        logger.debug(f'SQL command has been requested to be executed:\n\tCommand: "{operation}"\n\tParameters: {params}\n\tCommit: {auto_commit}\tBuffered: {buffered}')
-        cursor.execute(operation, params)
-        if auto_commit:
-            self.commit()
-
-        return cursor
-
-    def commit(self):
-        return self.connection.commit()
-
-    def describe_table(self, table: 'EasyTable'):
-        from EasySQL.Types import string_to_type
-
-        result = self.execute_command(f'DESCRIBE {self.name}.{table.name};', buffered=True).fetchall()
-        columns = []
-        for column in result:
-            sqltype = string_to_type(column[1])
-            if sqltype is None:
-                raise TypeError(f'Unable to recognize name "{column[1]}" as a SQLType')
-
-            tags = []
-            prim = []
-            if column[2] == 'NO':
-                tags.append(NOT_NULL)
-            if column[3] == 'PRI':
-                prim.append(column[0])
-
-            columns.append(EasyColumn(column[0], sqltype, *tags, default=column[4]))
-
-        return tuple(columns)
-
-    def set_charset(self, charset: Charset):
-        if charset is not None:
-            try:
-                try:
-                    command = f'SELECT DEFAULT_COLLATION_NAME, DEFAULT_CHARACTER_SET_NAME FROM information_schema.SCHEMATA WHERE information_schema.SCHEMATA.SCHEMA_NAME = \'{self.name}\''
-                    col, cha = self.execute_command(command, auto_commit=False).fetchall()[0]
-                except Exception:
-                    col, cha = (None, None)
-
-                if charset.name != cha or charset.collation != col:
-                    command = f'ALTER DATABASE {self._database} CHARACTER SET {charset.name} COLLATE {charset.collation};'
-                    self.execute_command(command)
-
-                self._charset = charset
-
-            except Exception as e:
-                logger.warn(f"Altering the charset of database failed due {e}")
 
 
 T = TypeVar('T')
