@@ -1,6 +1,8 @@
 from typing import Optional
 
-from . import Charset, EasyDatabase, EasyColumn
+from .Classes import EasyColumn
+from .Characters import Charset
+from .Database import EasyDatabase
 from .Types import *
 
 __all__ = ['EasyLocalHost', 'EasyInt64Column', 'EasyInt32Column', 'EasyInt24Column', 'EasyInt16Column', 'EasyInt08Column', 'EasyCharColumn',

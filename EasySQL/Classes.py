@@ -2,10 +2,10 @@ import inspect
 from itertools import zip_longest
 from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type
 
-from . import EasyDatabase
 from .ABC import SQLCommandExecutable
 from .Characters import Charset
 from .Constraints import NOT_NULL, Unique, UNIQUE, PRIMARY, SQLConstraints
+from .Database import EasyDatabase
 from .Exceptions import DatabaseSafetyException
 from .Logging import logger
 from .Types import SQLType
@@ -218,7 +218,7 @@ class EasyTable:
 
     def prepare(self, alter_columns=True):
         command = f'SHOW TABLES FROM {self._database.name} WHERE Tables_in_{self._database.name} = \'{self._name}\';'
-        exists = bool(self._database.execute_command(command, buffered=True).fetchall())
+        exists = bool(self._database.execute_command(command))
         if not exists:
             if self._columns:
                 command = ', '.join([column.get_sql() for column in self._columns])
@@ -300,7 +300,7 @@ class EasyTable:
                 logger.warn(f"Altering the charset of table failed due {e}")
 
     def count_rows(self):
-        return int(self._database.execute_command(f"SELECT COUNT(*) FROM {self.name};", buffered=True).fetchone()[0])
+        return int(self._database.execute_command(f"SELECT COUNT(*) FROM {self.name};").fetchone()[0])
 
     def get_column(self, target: Union[ECOS], *, force=False) -> Optional[EasyColumn]:
         if target in self._columns:
@@ -360,7 +360,7 @@ class Select(SQLCommandExecutable):
         return " ".join(parts) + ";"
 
     def execute(self) -> Union[None, SD, List[SD]]:
-        result = self._database.execute(self, auto_commit=False).fetchall()
+        result = self._database.execute(self, auto_commit=False)
         columns = self._columns or self._table.columns
         new_result = [SQLData(self._table, item, columns) for item in result]
 
@@ -410,7 +410,7 @@ class Insert(SQLCommandExecutable):
         return f"INSERT INTO {self._table.name} ({columns}) VALUES ({values}){extra};"
 
     def execute(self):
-        return self._database.execute(self, buffered=True).lastrowid
+        return self._database.execute(self)
 
     def into(self, *columns: ECOS) -> "Insert": return self._set(columns=self._table.assert_columns(columns))
 
@@ -438,7 +438,7 @@ class Update(SQLCommandExecutable):
         if self._database.safe and self._where is None:
             raise DatabaseSafetyException('Update without any condition is prohibited')
 
-        return self._database.execute(self, buffered=True).lastrowid
+        return self._database.execute(self)
 
     def where(self, where: Where) -> "Update":
         return self._set(where=where)
@@ -462,4 +462,4 @@ class Delete(SQLCommandExecutable):
         if self._database.safe and self._where is None:
             raise DatabaseSafetyException('Delete without any condition is prohibited')
 
-        return self._database.execute(self, buffered=True).lastrowid
+        return self._database.execute(self)

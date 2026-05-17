@@ -122,7 +122,7 @@ class SQLType:
 
 class IntegerSQLType(SQLType):
     def __init__(self, name, bit_size, default: Any = None, unsigned: bool = False, other_names: List[str] = None):
-        super().__init__(name, *other_names, caster=_get_int_cast_(bit_size), default=default)
+        super().__init__(name, other_names=other_names, caster=_get_int_cast_(bit_size), default=default)
 
         self.bit_size = bit_size
 

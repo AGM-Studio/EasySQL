@@ -1,10 +1,16 @@
 import asyncio
+import threading
+import time
 from typing import TYPE_CHECKING
 
 import asyncmy
 
-from . import Charset, DatabaseConnectionError, SQLCommandExecutable, NOT_NULL
+from .ABC import SQLCommandExecutable
+from .Characters import Charset
+from .Constraints import NOT_NULL
+from .Exceptions import DatabaseConnectionError
 from .Logging import logger
+
 if TYPE_CHECKING:
     from .Classes import EasyTable
 
@@ -19,15 +25,6 @@ def _ordinal(i: int):
     if i % 10 == 3:
         return f'{i}rd'
     return f'{i}th'
-
-
-def _run_sync(coro):
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    else:
-        return loop.create_task(coro)
 
 
 class AsyncEasyDatabase:
@@ -84,13 +81,12 @@ class AsyncEasyDatabase:
         retries = 5
         while retries > 0:
             try:
-                logger.info(
-                    f'Attempting to make a connection to database \'{self._database}\' on \'{self._host}\'({_ordinal(6 - retries)} attempt)')
+                logger.info(f'Attempting to make a connection to database \'{self._database}\' on \'{self._host}\'({_ordinal(6 - retries)} attempt)')
                 self._connection = await asyncmy.connect(**self._config)
                 if self.charset is not None:
                     self._connection.set_charset_collation(self._charset.name, self._charset.collation)
 
-                if self._connection.is_connected():
+                if self._connection.connected:
                     logger.info(f'Connection was successful')
                     break
                 else:
@@ -106,36 +102,45 @@ class AsyncEasyDatabase:
             self._charset_set = True
 
     async def get_connection(self):
-        if self._connection is None or not self._connection.is_connected():
+        if self._connection is None or not self._connection.connected:
             await self.connect()
-        if self._connection is None or not self._connection.is_connected():
+        if self._connection is None or not self._connection.connected:
             raise DatabaseConnectionError('Database is not connected')
 
         return self._connection
 
-    async def execute(self, sql: SQLCommandExecutable, params=(), buffered=False, auto_commit=True):
-        result = await self.execute_command(sql.get_value(), params, buffered, auto_commit)
+    async def execute(self, sql: SQLCommandExecutable, params=(), auto_commit=True):
+        result = await self.execute_command(sql.get_value(), params, auto_commit)
         setattr(sql, '_executed', True)
         return result
 
-    async def execute_command(self, operation, params=(), buffered=False, auto_commit=True):
+    async def execute_command(self, operation, params=(), auto_commit=True):
         connection = await self.get_connection()
-        cursor = connection.cursor(buffered=buffered)
-
         logger.debug(
-            f'SQL command has been requested to be executed:\n\tCommand: "{operation}"\n\tParameters: {params}\n\tCommit: {auto_commit}\tBuffered: {buffered}')
-        cursor.execute(operation, params)
-        if auto_commit: connection.commit()
+            f'SQL command has been requested to be executed:\n'
+            f'\tCommand: "{operation}"\n'
+            f'\tParameters: {params}\n'
+            f'\tCommit: {auto_commit}'
+        )
 
-        return cursor
+        async with connection.cursor() as cursor:
+            await cursor.execute(operation, params)
+            if auto_commit: await connection.commit()
+            if operation.strip().upper().startswith(("SELECT", "DESCRIBE", "SHOW")):
+                result = await cursor.fetchall()
+                return result
+            if operation.strip().upper().startswith("INSERT"):
+                return cursor.lastrowid
+
+            return cursor.rowcount
 
     async def describe_table(self, table: 'EasyTable'):
         from .Types import string_to_type
         from .Classes import EasyColumn
 
-        result = await self.execute_command(f'DESCRIBE {self.name}.{table.name};', buffered=True)
+        result = await self.execute_command(f'DESCRIBE {self.name}.{table.name};')
         columns = []
-        for column in result.fetchall():
+        for column in result:
             sqltype = string_to_type(column[1])
             if sqltype is None:
                 raise TypeError(f'Unable to recognize name "{column[1]}" as a SQLType')
@@ -169,21 +174,118 @@ class AsyncEasyDatabase:
                 logger.warn(f"Altering the charset of database failed due {e}")
 
 
-class EasyDatabase(AsyncEasyDatabase):
+class BackgroundEventLoop:
+    def __init__(self):
+        self._loop = None
+        self._thread = None
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+
+    def _run_loop(self):
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+        try:
+            self._loop.run_forever()
+        finally:
+            self._loop.close()
+            asyncio.set_event_loop(None)
+
+    def start(self):
+        with self._lock:
+            if self._thread is None or not self._thread.is_alive():
+                self._thread = threading.Thread(target=self._run_loop, daemon=True)
+                self._thread.start()
+                while self._loop is None:
+                    time.sleep(0.01)
+
+    def stop(self):
+        with self._lock:
+            if self._loop and self._thread and self._thread.is_alive():
+                self._loop.call_soon_threadsafe(self._loop.stop)
+                self._thread.join(timeout=5)
+                if self._thread.is_alive():
+                    logger.warn("Warning: Background event loop thread did not stop gracefully.")
+                self._thread = None
+                self._loop = None
+
+    def run_coro_in_loop(self, coro):
+        if not self._loop or self._loop.is_closed():
+            self.start()
+            if not self._loop or self._loop.is_closed():
+                raise RuntimeError("Background event loop could not be started or is closed.")
+            time.sleep(0.1)  # Small delay
+
+        try:
+            future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+            return future.result(timeout=10)
+        except asyncio.TimeoutError:
+            raise TimeoutError("Coroutine execution timed out.")
+        except Exception as e:
+            raise e
+
+
+background_loop_manager = BackgroundEventLoop()
+background_loop_manager.start()
+
+
+def _run_sync(coro):
+    return background_loop_manager.run_coro_in_loop(coro)
+
+
+class EasyDatabase:
+    _database: str = None
+    _password: str = None
+    _host: str = "127.0.0.1"
+    _port: int = 3306
+    _user: str = "root"
+
+    _charset: Charset = None
+
+    def __init_subclass__(cls, **kwargs):
+        for key in ('database', 'password', 'host', 'port', 'user', 'charset'):
+            setattr(cls, f'_{key}', kwargs.pop(key, None) or getattr(cls, f'_{key}'))
+
+    def __init__(self, *, _force=False):
+        class AsyncBackendDatabase(AsyncEasyDatabase):
+            _charset: Charset = self._charset
+            _database: str = self._database
+            _password: str = self._password
+            _host: str = self._host
+            _port: int = self._port
+            _user: str = self._user
+
+
+        self.__adb = AsyncBackendDatabase()
+
+    @property
+    def safe(self):
+        return self.__adb.safe
+
+    def remove_safety(self, *, confirm: bool):
+        self.__adb.remove_safety(confirm=confirm)
+
+    @property
+    def charset(self):
+        return self.__adb.charset
+
+    @property
+    def name(self):
+        return self.__adb.name
+
     def connect(self):
-        return _run_sync(super().connect())
+        return _run_sync(self.__adb.connect())
 
     def get_connection(self):
-        return _run_sync(super().get_connection())
+        return _run_sync(self.__adb.get_connection())
 
-    def execute(self, sql: SQLCommandExecutable, params=(), buffered=False, auto_commit=True):
-        return _run_sync(super().execute(sql, params, buffered, auto_commit))
+    def execute(self, sql: SQLCommandExecutable, params=(), auto_commit=True):
+        return _run_sync(self.__adb.execute(sql, params, auto_commit=auto_commit))
 
-    def execute_command(self, operation, params=(), buffered=False, auto_commit=True):
-        return _run_sync(super().execute_command(operation, params, buffered, auto_commit))
+    def execute_command(self, operation, params=(), auto_commit=True):
+        return _run_sync(self.__adb.execute_command(operation, params, auto_commit=auto_commit))
 
     def describe_table(self, table: 'EasyTable'):
-        return _run_sync(self.describe_table(table))
+        return _run_sync(self.__adb.describe_table(table))
 
     def set_charset(self, charset: Charset):
-        return _run_sync(self.set_charset(charset))
+        return _run_sync(self.__adb.set_charset(charset))

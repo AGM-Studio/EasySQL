@@ -46,7 +46,9 @@ def get(name: str = None, colors: dict = None):
     return instance_logger
 
 
-logger = logging.getLogger('EasySQL')
+logger = get('EasySQL')
+logger.setLevel(logging.INFO)
+
 debug = logger.debug
 info = logger.info
 warning = logger.warning

@@ -70,7 +70,7 @@ class WhereIsLesserEqual(Where):
 
 class WhereIsLike(Where):
     def __init__(self, column, value):
-        super().__init__(f"{column.name} LIKE {column.parse(value)}")
+        super().__init__(f"{column.name} LIKE {column.parse(value).replace("%", "%%")}")
 
 
 class WhereIsIn(Where):
