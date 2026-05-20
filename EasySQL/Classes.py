@@ -4,7 +4,7 @@ from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type
 
 from .ABC import SQLCommandExecutable
 from .Constants import Charset, SQLConstraints, SQLType, NOT_NULL, UNIQUE, PRIMARY, Unique
-from .Database import EasyDatabase
+from .Database import SyncedDB
 from .Exceptions import DatabaseSafetyException
 from .Logging import logger
 from .Where import WhereAble, Where
@@ -142,7 +142,7 @@ SOS_ECOS = SOS[ECOS]
 
 
 class EasyTable:
-    _database: EasyDatabase = NotImplemented
+    _database: SyncedDB = NotImplemented
     _name: str = NotImplemented
     _columns: Tuple[EasyColumn, ...] = ()
     _data_class: Type[T] = None
@@ -195,7 +195,7 @@ class EasyTable:
         if self.__class__ == EasyTable and not _force:
             raise TypeError('Version 3: Unable to instance \'EasyTable\' directly, Create a subclass')
 
-        if not isinstance(self._database, EasyDatabase):
+        if not isinstance(self._database, SyncedDB):
             raise TypeError('Version 3: Database is not implemented')
 
         if not isinstance(self._name, str):
@@ -329,7 +329,7 @@ class EasyTable:
 
 
 class Select(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, table: EasyTable, *columns: ECOS):
+    def __init__(self, database: SyncedDB, table: EasyTable, *columns: ECOS):
         self._database = database
         self._table = table
         self._columns = table.assert_columns(columns)
@@ -385,7 +385,7 @@ class Select(SQLCommandExecutable):
 
 
 class Insert(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, table: EasyTable, *values: Any):
+    def __init__(self, database: SyncedDB, table: EasyTable, *values: Any):
         self._database = database
         self._table = table
         self._columns = table.columns
@@ -418,7 +418,7 @@ class Insert(SQLCommandExecutable):
 # noinspection SqlWithoutWhere
 # The asserts will not allow the missing where
 class Update(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, table: EasyTable, *columns: ECOS):
+    def __init__(self, database: SyncedDB, table: EasyTable, *columns: ECOS):
         self._database = database
         self._table = table
         self._columns = self._table.assert_columns(columns)
@@ -448,7 +448,7 @@ class Update(SQLCommandExecutable):
 # noinspection SqlWithoutWhere
 # The asserts will not allow the missing where
 class Delete(SQLCommandExecutable):
-    def __init__(self, database: EasyDatabase, table: EasyTable = None, where: Where = None):
+    def __init__(self, database: SyncedDB, table: EasyTable = None, where: Where = None):
         self._database = database
         self._table = table
         self._where = where

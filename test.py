@@ -7,7 +7,7 @@ EasySQL.enable_debug()
 
 # Simply provide connection info to your database
 @EasySQL.auto_init
-class MyDatabase(EasySQL.EasyDatabase):
+class MyDatabase(EasySQL.SyncedDB):
     _database = 'MyDatabase'
     _password = ''
     _host = '127.0.0.1'

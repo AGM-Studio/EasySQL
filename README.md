@@ -31,10 +31,10 @@ By installing this library following libraries and their dependencies will be in
 mysql-connector: Which is the basic library for connecting to database
 ```
 # Example
-Link on GitHub: https://github.com/AGM-Studio/EasySQL/blob/master/test.py 
+Link on GitHub: https://github.com/AGM-Studio/EasySQL/blob/master/test.py
+
 ```python
 import EasySQL
-
 
 # Enable debug mode if you like to get SPAMMED with SQL!
 EasySQL.enable_debug()
@@ -42,7 +42,7 @@ EasySQL.enable_debug()
 
 # Simply provide connection info to your database
 @EasySQL.auto_init
-class MyDatabase(EasySQL.EasyDatabase):
+class MyDatabase(EasySQL.SyncedDB):
     _database = 'MyDatabase'
     _password = ''
     _host = '127.0.0.1'

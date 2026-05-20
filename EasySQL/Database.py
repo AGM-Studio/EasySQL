@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from .Classes import EasyTable
 
 
+__all__ = ["Database", "AsyncDB", "SyncedDB", "SyncedDatabase", "AsyncDatabase"]
+
+
 def _ordinal(i: int):
     if 10 < i % 100 < 20:
         return f'{i}th'
@@ -26,40 +29,124 @@ def _ordinal(i: int):
     return f'{i}th'
 
 
-class AsyncEasyDatabase:
-    _database: str = None
-    _password: str = None
-    _host: str = "127.0.0.1"
-    _port: int = 3306
-    _user: str = "root"
+class BackgroundEventLoop:
+    def __init__(self):
+        self._loop = None
+        self._thread = None
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
 
-    _charset: Charset = None
+    def _run_loop(self):
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+        try:
+            self._loop.run_forever()
+        finally:
+            self._loop.close()
+            asyncio.set_event_loop(None)
+
+    def start(self):
+        with self._lock:
+            if self._thread is None or not self._thread.is_alive():
+                self._thread = threading.Thread(target=self._run_loop, daemon=True)
+                self._thread.start()
+                while self._loop is None:
+                    time.sleep(0.01)
+
+    def stop(self):
+        with self._lock:
+            if self._loop and self._thread and self._thread.is_alive():
+                self._loop.call_soon_threadsafe(self._loop.stop)
+                self._thread.join(timeout=5)
+                if self._thread.is_alive():
+                    logger.warn("Warning: Background event loop thread did not stop gracefully.")
+                self._thread = None
+                self._loop = None
+
+    def run_coro_in_loop(self, coro):
+        if not self._loop or self._loop.is_closed():
+            self.start()
+            if not self._loop or self._loop.is_closed():
+                raise RuntimeError("Background event loop could not be started or is closed.")
+
+            time.sleep(0.1)
+        try:
+            future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+            return future.result(timeout=10)
+        except asyncio.TimeoutError:
+            raise TimeoutError("Coroutine execution timed out.")
+        except Exception as e:
+            raise e
+
+
+background_loop_manager = BackgroundEventLoop()
+background_loop_manager.start()
+
+
+def _run_sync(coro):
+    return background_loop_manager.run_coro_in_loop(coro)
+
+
+_db_keywords = (('database', str), ('password', str), ('host', str), ('port', int), ('user', str), ('charset', Charset))
+def _get_and_assert_type(obj, data, key, value_type):
+    value = data.pop(key, None) or getattr(obj, f'_{key}')
+    if isinstance(value, value_type): return value
+    raise TypeError(f"{key} must be of type {value_type}")
+
+
+class Database:
+    """This is actually a dataclass, Needs to be created to an async or a sync database to be usable."""
+    database: str = None
+    password: str = None
+    host: str = "127.0.0.1"
+    port: int = 3306
+    user: str = "root"
+
+    charset: Charset = None
 
     def __init_subclass__(cls, **kwargs):
-        for key in ('database', 'password', 'host', 'port', 'user', 'charset'):
-            setattr(cls, f'_{key}', kwargs.pop(key, None) or getattr(cls, f'_{key}'))
+        for key, value_type in _db_keywords:
+            setattr(cls, f'_{key}', _get_and_assert_type(cls, kwargs, key, value_type))
 
-    def __init__(self, *, _force=False):
-        if self.__class__ in (EasyDatabase, AsyncEasyDatabase) and not _force:
-            raise TypeError('Version 3: Unable to instance \'EasyDatabase\' directly, Create a subclass')
+    def __init__(self):
+        self.__async = None
+        self.__sync = None
 
-        if self._database is None:
+    def create_synced(self) -> "SyncedDB":
+        if self.__sync is None:
+            self.__sync = self.create().get_synced()
+
+        return self.__sync
+
+    def create(self) -> "AsyncDB":
+        if self.__async is None:
+            self.__async = AsyncDB(self.database, self.password, self.host, self.port, self.user, self.charset)
+
+        return self.__async
+
+
+class AsyncDB:
+    """The heart of the Database which supports async calls"""
+    def __init__(self, database: str, password: str, host: str = "127.0.0.1", port: int = 3306, user: str = "root", charset: Charset = None):
+        if database is None:
             raise ValueError('database argument is required.')
-        if self._password is None:
+        if password is None:
             raise ValueError('password is not provided.')
         if self._charset is not None and not isinstance(self._charset, Charset):
             raise TypeError(f'charset must be type of "CHARSET" or "NONE", not "{type(self._charset)}"')
 
-        self._config = dict(
-            host=self._host, port=self._port, database=self._database, user=self._user, password=self._password
-        )
-        if self.charset is not None:
-            self._config['charset'] = self.charset.name
-            self._config['collation'] = self.charset.collation
+        self._database = self.name = database
+        self._password = password
+        self._host = host
+        self._port = port
+        self._user = user
 
+        self._charset = charset
         self._charset_set = False
+
         self._connection = None
         self._safe = True
+        self._sync = None
 
     @property
     def safe(self):
@@ -72,16 +159,25 @@ class AsyncEasyDatabase:
     def charset(self):
         return self._charset
 
-    @property
-    def name(self):
-        return self._database
+    def get_synced(self):
+        if self._sync is None:
+            self._sync = SyncedDB(self)
+
+        return self._sync
 
     async def connect(self):
+        config = dict(
+            database=self._database, password=self._password, host=self._host, port=self._port, user=self._user
+        )
+        if self._charset is not None:
+            config['charset'] = self._charset.name
+            config['collation'] = self._charset.name
+
         retries = 5
         while retries > 0:
             try:
                 logger.info(f'Attempting to make a connection to database \'{self._database}\' on \'{self._host}\'({_ordinal(6 - retries)} attempt)')
-                self._connection = await asyncmy.connect(**self._config)
+                self._connection = await asyncmy.connect(**config)
                 if self.charset is not None:
                     self._connection.set_charset_collation(self._charset.name, self._charset.collation)
 
@@ -173,88 +269,10 @@ class AsyncEasyDatabase:
                 logger.warn(f"Altering the charset of database failed due {e}")
 
 
-class BackgroundEventLoop:
-    def __init__(self):
-        self._loop = None
-        self._thread = None
-        self._lock = threading.Lock()
-        self._stop_event = threading.Event()
-
-    def _run_loop(self):
-        self._loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._loop)
-        try:
-            self._loop.run_forever()
-        finally:
-            self._loop.close()
-            asyncio.set_event_loop(None)
-
-    def start(self):
-        with self._lock:
-            if self._thread is None or not self._thread.is_alive():
-                self._thread = threading.Thread(target=self._run_loop, daemon=True)
-                self._thread.start()
-                while self._loop is None:
-                    time.sleep(0.01)
-
-    def stop(self):
-        with self._lock:
-            if self._loop and self._thread and self._thread.is_alive():
-                self._loop.call_soon_threadsafe(self._loop.stop)
-                self._thread.join(timeout=5)
-                if self._thread.is_alive():
-                    logger.warn("Warning: Background event loop thread did not stop gracefully.")
-                self._thread = None
-                self._loop = None
-
-    def run_coro_in_loop(self, coro):
-        if not self._loop or self._loop.is_closed():
-            self.start()
-            if not self._loop or self._loop.is_closed():
-                raise RuntimeError("Background event loop could not be started or is closed.")
-
-            time.sleep(0.1)
-        try:
-            future = asyncio.run_coroutine_threadsafe(coro, self._loop)
-            return future.result(timeout=10)
-        except asyncio.TimeoutError:
-            raise TimeoutError("Coroutine execution timed out.")
-        except Exception as e:
-            raise e
-
-
-background_loop_manager = BackgroundEventLoop()
-background_loop_manager.start()
-
-
-def _run_sync(coro):
-    return background_loop_manager.run_coro_in_loop(coro)
-
-
-class EasyDatabase:
-    _database: str = None
-    _password: str = None
-    _host: str = "127.0.0.1"
-    _port: int = 3306
-    _user: str = "root"
-
-    _charset: Charset = None
-
-    def __init_subclass__(cls, **kwargs):
-        for key in ('database', 'password', 'host', 'port', 'user', 'charset'):
-            setattr(cls, f'_{key}', kwargs.pop(key, None) or getattr(cls, f'_{key}'))
-
-    def __init__(self, *, _force=False):
-        class AsyncBackendDatabase(AsyncEasyDatabase):
-            _charset: Charset = self._charset
-            _database: str = self._database
-            _password: str = self._password
-            _host: str = self._host
-            _port: int = self._port
-            _user: str = self._user
-
-
-        self.__adb = AsyncBackendDatabase()
+class SyncedDB:
+    """This class is actually a wrapper where runs an async database in background"""
+    def __init__(self, async_db):
+        self.__adb = async_db
 
     @property
     def safe(self):
@@ -288,3 +306,15 @@ class EasyDatabase:
 
     def set_charset(self, charset: Charset):
         return _run_sync(self.__adb.set_charset(charset))
+
+
+# noinspection PyPep8Naming
+def SyncedDatabase(name: str, host: str = "127.0.0.1", port: int = 3306, user: str = "root", password: str = None, charset: Charset = None) -> SyncedDB:
+    """Creates a clean SyncDB without Database Dataclass"""
+    return AsyncDB(name, password, host, port, user, charset).get_synced()
+
+
+# noinspection PyPep8Naming
+def AsyncDatabase(name: str, host: str = "127.0.0.1", port: int = 3306, user: str = "root", password: str = None, charset: Charset = None) -> AsyncDB:
+    """Creates a clean AsyncDB without Database Dataclass"""
+    return AsyncDB(name, password, host, port, user, charset)
