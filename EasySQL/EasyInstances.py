@@ -1,9 +1,8 @@
 from typing import Optional
 
 from .Classes import EasyColumn
-from .Characters import Charset
+from .Constants import Charset, Types
 from .Database import EasyDatabase
-from .Types import *
 
 __all__ = ['EasyLocalHost', 'EasyInt64Column', 'EasyInt32Column', 'EasyInt24Column', 'EasyInt16Column', 'EasyInt08Column', 'EasyCharColumn',
            'EasyBitColumn', 'EasyBoolColumn', 'EasyFloatColumn', 'EasyDoubleColumn', 'EasyDecimalColumn', 'EasyStringColumn']
@@ -24,59 +23,59 @@ class EasyLocalHost(EasyDatabase):
 
 class EasyInt64Column(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, INT64)
+        super().__init__(name, Types.INT64)
 
 
 class EasyInt32Column(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, INT32)
+        super().__init__(name, Types.INT32)
 
 
 class EasyInt24Column(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, INT24)
+        super().__init__(name, Types.INT24)
 
 
 class EasyInt16Column(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, INT16)
+        super().__init__(name, Types.INT16)
 
 
 class EasyInt08Column(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, INT8)
+        super().__init__(name, Types.INT8)
 
 
 class EasyBitColumn(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, BIT)
+        super().__init__(name, Types.BIT)
 
 
 class EasyBoolColumn(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, BOOL)
+        super().__init__(name, Types.BOOL)
 
 
 class EasyFloatColumn(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, FLOAT)
+        super().__init__(name, Types.FLOAT)
 
 
 class EasyDoubleColumn(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, DOUBLE)
+        super().__init__(name, Types.DOUBLE)
 
 
 class EasyDecimalColumn(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, DECIMAL)
+        super().__init__(name, Types.DECIMAL)
 
 
 class EasyStringColumn(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, BIGINT)
+        super().__init__(name, Types.BIGINT)
 
 
 class EasyCharColumn(EasyColumn):
     def __init__(self, name: str):
-        super().__init__(name, BIGINT)
+        super().__init__(name, Types.BIGINT)

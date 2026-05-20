@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING
 import asyncmy
 
 from .ABC import SQLCommandExecutable
-from .Characters import Charset
-from .Constraints import NOT_NULL
+from .Constants import Charset, NOT_NULL
 from .Exceptions import DatabaseConnectionError
 from .Logging import logger
 
@@ -135,13 +134,13 @@ class AsyncEasyDatabase:
             return cursor.rowcount
 
     async def describe_table(self, table: 'EasyTable'):
-        from .Types import string_to_type
+        from .Constants import Types
         from .Classes import EasyColumn
 
         result = await self.execute_command(f'DESCRIBE {self.name}.{table.name};')
         columns = []
         for column in result:
-            sqltype = string_to_type(column[1])
+            sqltype = Types.from_string(column[1])
             if sqltype is None:
                 raise TypeError(f'Unable to recognize name "{column[1]}" as a SQLType')
 
@@ -213,8 +212,8 @@ class BackgroundEventLoop:
             self.start()
             if not self._loop or self._loop.is_closed():
                 raise RuntimeError("Background event loop could not be started or is closed.")
-            time.sleep(0.1)  # Small delay
 
+            time.sleep(0.1)
         try:
             future = asyncio.run_coroutine_threadsafe(coro, self._loop)
             return future.result(timeout=10)

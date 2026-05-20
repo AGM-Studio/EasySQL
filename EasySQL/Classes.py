@@ -3,12 +3,10 @@ from itertools import zip_longest
 from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type
 
 from .ABC import SQLCommandExecutable
-from .Characters import Charset
-from .Constraints import NOT_NULL, Unique, UNIQUE, PRIMARY, SQLConstraints
+from .Constants import Charset, SQLConstraints, SQLType, NOT_NULL, UNIQUE, PRIMARY, Unique
 from .Database import EasyDatabase
 from .Exceptions import DatabaseSafetyException
 from .Logging import logger
-from .Types import SQLType
 from .Where import WhereAble, Where
 
 __all__ = ['EasyTable', 'EasyColumn', 'EasyForeignColumn', 'SQLData', 'EmptySQLData']
