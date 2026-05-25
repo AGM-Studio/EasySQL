@@ -1,14 +1,12 @@
 import asyncio
 import threading
 from abc import ABC, abstractmethod
-from typing import Union, Coroutine
+from typing import Coroutine
 
 import asyncmy
 
 from .constants import Charset
-from .exceptions import DatabaseConnectionError
 from .logger import logger
-
 
 __all__ = ["AsyncDB", "AsyncDatabase", "SyncedDB", "SyncedDatabase"]
 
@@ -129,7 +127,7 @@ class AsyncDB(ABCDatabase):
         if self._connection is None or not self._connection.connected:
             await self.connect()
         if self._connection is None or not self._connection.connected:
-            raise DatabaseConnectionError('Database is not connected')
+            raise EOFError('Database is not connected, EOC!')
 
         return self._connection
 
