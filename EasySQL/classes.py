@@ -1,14 +1,15 @@
-import re
-from abc import ABC
+from abc import ABC, abstractmethod
 from itertools import zip_longest
 from typing import Union, Any, TypeVar, overload, Generic, List, Optional, Tuple, Type, Dict, Iterable
 
-from .abc import ABCSQLTable
 from .constants import *
-from .database import AsyncDB
+from .database import AsyncDB, SyncedDB
 from .logger import logger
-from . import SyncedDB
-from .sql import Where, WhereIsEqual, WhereIsNotEqual, WhereIsLesserEqual, WhereIsGreaterEqual, WhereIsGreater, WhereIsLesser
+from .sql import (
+    Where, WhereIsEqual, WhereIsNotEqual,
+    WhereIsGreaterEqual, WhereIsGreater,
+    WhereIsLesserEqual, WhereIsLesser
+)
 
 T = TypeVar("T")
 D = TypeVar("D", bound="SQLData")
@@ -22,21 +23,16 @@ __all__ = [
 ]
 
 
-def _camel_to_snake(name: str) -> str:
-    name = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
-    name = re.sub("__([A-Z])", r"_\1", name)
-    name = re.sub("([a-z0-9])([A-Z])", r"\1_\2", name)
-    return name.lower()
+class ABCSQLTable(ABC, Generic[D, DB]):
+    """Abstract Base Class for Sync & Async SQL table."""
 
-
-class BaseSQLTable(ABCSQLTable[D, DB], ABC):
     PRIMARY: List["SQLColumnExpr"] = None
     UNIQUES: List[Unique] = None
 
     def __init__(self, cls: Type[D], name: str = None, database: DB = None, charset: Charset = None):
         if database is None: raise ValueError("database is a required argument")
         self.database = database
-        self.name = name or _camel_to_snake(self.__name__)
+        self.name = name or self.__name__
         self.charset = charset or self.database.charset
         self.data_class = cls
 
@@ -61,6 +57,29 @@ class BaseSQLTable(ABCSQLTable[D, DB], ABC):
 
         self.__prepared = False
         self.database.add_to_prepare(self._prepare())
+
+    @abstractmethod
+    def insert(self, _: D = None, __update=True, **kwargs): ...
+
+    @abstractmethod
+    def insert_with_no_update(self, _: D = None, **kwargs): ...
+
+    @abstractmethod
+    def select(
+            self, where = None, *,
+            order: Union[Iterable, "SQLColumnExpr", str] = None, descending: bool = False,
+            limit: int = None, get_one: bool = None,
+            offset: int = None
+    ): ...
+
+    @abstractmethod
+    def delete(self, where): ...
+
+    @abstractmethod
+    def update(self, _: D = None, **kwargs): ...
+
+    @abstractmethod
+    def update_where(self, where, _: D = None, **kwargs): ...
 
     async def _prepare(self):
         # noinspection PyUnresolvedReferences
@@ -223,7 +242,7 @@ class BaseSQLTable(ABCSQLTable[D, DB], ABC):
         return where_clause
 
 
-class SyncedSQLTable(BaseSQLTable[D, SyncedDB]):
+class SyncedSQLTable(ABCSQLTable[D, SyncedDB]):
     def insert_with_no_update(self, _: D = None, **kwargs):
         return self.insert(_, __update=False, **kwargs)
 
@@ -251,7 +270,7 @@ class SyncedSQLTable(BaseSQLTable[D, SyncedDB]):
         return self.database.execute(self._get_update_command(where, _, **kwargs))
 
 
-class AsyncSQLTable(BaseSQLTable[D, AsyncDB]):
+class AsyncSQLTable(ABCSQLTable[D, AsyncDB]):
     async def insert_with_no_update(self, _: D = None, **kwargs):
         return await self.insert(_, __update=False, **kwargs)
 
@@ -280,7 +299,7 @@ class AsyncSQLTable(BaseSQLTable[D, AsyncDB]):
 
 
 class SQLData:
-    table: BaseSQLTable
+    table: ABCSQLTable
     _column_attributes: set = set()
     def __init_subclass__(cls, _abstract: bool = False, name: str = None, database: Union[SyncedDB, AsyncDB] = None, charset: Charset = None, **kwargs):
         if _abstract: return
@@ -418,7 +437,7 @@ class SQLForeignColumnExpr(SQLColumnExpr):
         name = f"{column.name} of {column.table.name}" if name is None else name
         return SQLForeignColumnExpr(name, column.table, column, *tags, default=default)
 
-    def __init__(self, name: str, table: "BaseSQLTable", reference: SQLColumnExpr, *tags: SQLConstraints, default: Any = None, cascade: bool = True):
+    def __init__(self, name: str, table: "ABCSQLTable", reference: SQLColumnExpr, *tags: SQLConstraints, default: Any = None, cascade: bool = True):
         self.refer_table = table
         self.refer_column = reference
         self.cascade = cascade
