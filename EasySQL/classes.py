@@ -8,7 +8,7 @@ from .logger import logger
 from .sql import (
     Where, WhereIsEqual, WhereIsNotEqual,
     WhereIsGreaterEqual, WhereIsGreater,
-    WhereIsLesserEqual, WhereIsLesser
+    WhereIsLesserEqual, WhereIsLesser, SQLType, Types
 )
 
 T = TypeVar("T")
@@ -88,7 +88,7 @@ class ABCSQLTable(ABC, Generic[D, DB]):
                     if column.cascade: command += " ON DELETE CASCADE"
 
             for unique in self.uniques:
-                command += f", {unique.value}"
+                command += f", {unique._sql}"
 
             command = f"CREATE TABLE {self.name} ({command});"
             await async_db.execute(command)
@@ -114,11 +114,10 @@ class ABCSQLTable(ABC, Generic[D, DB]):
                 lc2 = [column.__repr__() for column in c2 - c1]
                 lc = zip_longest(lc1, lc2, "")
                 length = len(max(["Provided: "] + lc1, key=lambda col: len(col)))
-
-                logger.warn(
+                raise ValueError(
                     f"Columns specified do not match with existing ones:\n\tProvided:{" " * (length - 10)}\t\tExisting:\n\t" +
-                    "\n\t".join([f"{lci[0]}{" " * (length - len(str(lci[0])))}\t\t{lci[1]}" for lci in lc]))
-                raise ValueError("Existing table does not match with specified columns.")
+                    "\n\t".join([f"{lci[0]}{" " * (length - len(str(lci[0])))}\t\t{lci[1]}" for lci in lc])
+                )
 
         if self.charset is not None:
             try:
@@ -351,6 +350,12 @@ class SQLColumnExpr(Generic[T]):
 
     def __str__(self):
         return self.name
+
+    def _create_where(self, where_type: Type[Where], value):
+        try:
+            return where_type(self, self.sql_type.cast(value))
+        except Exception as e:
+            raise TypeError(f"Unable to create Where clause by \"{value}\"({type(value)}) due to {e}.")
 
     def __eq__(self, other):
         if isinstance(other, SQLColumnExpr):

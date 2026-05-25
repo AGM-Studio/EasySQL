@@ -8,7 +8,7 @@ import asyncmy
 from .constants import Charset
 from .exceptions import DatabaseConnectionError
 from .logger import logger
-from .sql import SQLCommandExecutable
+
 
 __all__ = ["AsyncDB", "AsyncDatabase", "SyncedDB", "SyncedDatabase"]
 
@@ -49,7 +49,7 @@ class ABCDatabase(ABC):
     def get_connection(self): ...
 
     @abstractmethod
-    def execute(self, command: Union["SQLCommandExecutable", str], params=(), auto_commit=True): ...
+    def execute(self, command: str, params=(), auto_commit=True): ...
 
     @abstractmethod
     def set_charset(self, charset: "Charset"): ...
@@ -133,12 +133,7 @@ class AsyncDB(ABCDatabase):
 
         return self._connection
 
-    async def execute(self, command: Union[SQLCommandExecutable, str], params=(), auto_commit=True):
-        if isinstance(command, SQLCommandExecutable):
-            result = await self.execute(command.sql(), params, auto_commit)
-            setattr(command, '_executed', True)
-            return result
-
+    async def execute(self, command: str, params=(), auto_commit=True):
         connection = await self.get_connection()
         logger.debug(
             f'SQL command has been requested to be executed:\n'
@@ -225,8 +220,8 @@ class SyncedDB(ABCDatabase):
     def get_connection(self):
         return self._run_sync(self.async_db.get_connection())
 
-    def execute(self, sql: Union[SQLCommandExecutable, str], params=(), auto_commit=True):
-        return self._run_sync(self.async_db.execute(sql, params, auto_commit=auto_commit))
+    def execute(self, command: str, params=(), auto_commit=True):
+        return self._run_sync(self.async_db.execute(command, params, auto_commit=auto_commit))
 
     def set_charset(self, charset: Charset):
         return self._run_sync(self.async_db.set_charset(charset))
