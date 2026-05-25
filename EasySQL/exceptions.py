@@ -10,7 +10,5 @@ class DatabaseError(Exception):
 
 class DatabaseConnectionError(DatabaseError):
     """Error raised when the database is accessed while is not connected."""
-class DatabaseSafetyException(DatabaseError):
-    """Error raised when an insecure action is attempted."""
 class SQLTypeException(DatabaseError):
     """Error related to the SQL types."""

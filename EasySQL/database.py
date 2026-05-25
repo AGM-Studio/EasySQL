@@ -40,13 +40,6 @@ class ABCDatabase(ABC):
 
     @property
     @abstractmethod
-    def safe(self) -> bool: ...
-
-    @abstractmethod
-    def remove_safety(self, *, confirm: bool): ...
-
-    @property
-    @abstractmethod
     def charset(self) -> "Charset": ...
 
     @abstractmethod
@@ -88,16 +81,8 @@ class AsyncDB(ABCDatabase):
         self._charset_set = False
 
         self._connection = None
-        self._safe = True
         self._sync = None
         self._prepares = []
-
-    @property
-    def safe(self):
-        return self._safe
-
-    def remove_safety(self, *, confirm: bool):
-        self._safe = not confirm
 
     @property
     def charset(self):
@@ -225,13 +210,6 @@ class SyncedDB(ABCDatabase):
         """Helper to safely run coroutines on the background thread."""
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         return future.result()
-
-    @property
-    def safe(self):
-        return self.async_db.safe
-
-    def remove_safety(self, *, confirm: bool):
-        self.async_db.remove_safety(confirm=confirm)
 
     @property
     def charset(self):

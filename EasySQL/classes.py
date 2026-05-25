@@ -25,10 +25,6 @@ __all__ = [
 
 class ABCSQLTable(ABC, Generic[D, DB]):
     """Abstract Base Class for Sync & Async SQL table."""
-
-    PRIMARY: List["SQLColumnExpr"] = None
-    UNIQUES: List[Unique] = None
-
     def __init__(self, cls: Type[D], name: str = None, database: DB = None, charset: Charset = None):
         if database is None: raise ValueError("database is a required argument")
         self.database = database
@@ -36,24 +32,16 @@ class ABCSQLTable(ABC, Generic[D, DB]):
         self.charset = charset or self.database.charset
         self.data_class = cls
 
-        # Todo!
-        self.PRIMARY = [] if self.PRIMARY is None else self.PRIMARY
-        self.UNIQUES = [] if self.UNIQUES is None else self.UNIQUES
+        self.uniques = getattr(cls, "uniques", [])
+        self.primary_map: Dict[str, SQLColumnExpr] = {}
 
         self._columns: Dict[str, SQLColumnExpr] = {key: value for key, value in cls.__dict__.items() if
                                                    isinstance(value, SQLColumnExpr)}
         for key, column in self._columns.items():
-            if UNIQUE in column.tags: self.UNIQUES.append(Unique(column))
-            if PRIMARY in column.tags: self.PRIMARY.append(column)
+            if UNIQUE in column.tags: self.uniques.append(Unique(column))
+            if PRIMARY in column.tags: self.primary_map[key] = column
 
             column.tags = tuple([tag for tag in column.tags if tag != UNIQUE and tag != PRIMARY])
-
-        self.primary_map: Dict[str, SQLColumnExpr] = {}
-        for primary in self.PRIMARY:
-            for k, c in self._columns.items():
-                if c == primary:
-                    self.primary_map[k] = primary
-                    break
 
         self.__prepared = False
         self.database.add_to_prepare(self._prepare())
@@ -91,15 +79,15 @@ class ABCSQLTable(ABC, Generic[D, DB]):
                 raise ValueError("No columns where specified and table does not exist")
 
             command = ", ".join([column.get_sql() for column in self.columns])
-            if len(self.PRIMARY) > 0:
-                command += f", PRIMARY KEY({", ".join(column.name for column in self.PRIMARY)})"
+            if len(self.primary_map) > 0:
+                command += f", PRIMARY KEY({", ".join(column.name for column in self.primary_map.values())})"
 
             for column in self._columns:
                 if isinstance(column, SQLForeignColumnExpr):
                     command += f", FOREIGN KEY ({column.name}) REFERENCES {column.refer_table.name}({column.refer_column.name})"
                     if column.cascade: command += " ON DELETE CASCADE"
 
-            for unique in self.UNIQUES:
+            for unique in self.uniques:
                 command += f", {unique.value}"
 
             command = f"CREATE TABLE {self.name} ({command});"
@@ -300,6 +288,7 @@ class AsyncSQLTable(ABCSQLTable[D, AsyncDB]):
 
 class SQLData:
     table: ABCSQLTable
+    uniques: List[Unique]
     _column_attributes: set = set()
     def __init_subclass__(cls, _abstract: bool = False, name: str = None, database: Union[SyncedDB, AsyncDB] = None, charset: Charset = None, **kwargs):
         if _abstract: return
