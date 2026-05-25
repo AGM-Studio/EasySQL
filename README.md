@@ -1,4 +1,4 @@
-# EasySQL - New System 4.0.0
+# EasySQL - Now with Async System by 5.0.0
 ![Downloads](https://pepy.tech/badge/pyeasysql)
 ![Downloads](https://pepy.tech/badge/pyeasysql/week)
 ![Downloads](https://pepy.tech/badge/pyeasysql/month)  
@@ -28,132 +28,159 @@ pip install --upgrade git+https://github.com/AGM-Studio/EasySQL.git
 ***
 By installing this library following libraries and their dependencies will be installed too.
 ```yaml
-mysql-connector: Which is the basic library for connecting to database
+asyncmy: Which is the basic library for connecting to database
 ```
 # Example
-Link on GitHub: https://github.com/AGM-Studio/EasySQL/blob/master/test.py
-
+### Sync example:
+Link to GitHub: https://github.com/AGM-Studio/EasySQL/blob/master/sync_test.py
 ```python
-import EasySQL.database
-import EasySQL.sync.database
 import EasySQL
 
 # Enable debug mode if you like to get SPAMMED with SQL!
 EasySQL.enable_debug()
 
-
 # Simply provide connection info to your database
-@EasySQL.auto_init
-class MyDatabase(EasySQL.database.SyncedDB):
-    _database = 'MyDatabase'
-    _password = ''
-    _host = '127.0.0.1'
-    _port = 3306
-    _user = 'root'
+database = EasySQL.SyncedDatabase(
+    database="MyDatabase",
+    password="", # host, port and user set by default to usual localhost settings
+)
 
+# In V5 the table is now merged with table! Access the table through User.table!
+class User(EasySQL.SQLData, database=database, name="MyTable"):
+    id = EasySQL.SQLColumn("ID", EasySQL.Types.BIGINT, EasySQL.PRIMARY, EasySQL.AUTO_INCREMENT)
+    name = EasySQL.SQLColumn("Name", EasySQL.Types.STRING(255), EasySQL.NOT_NULL, default="Missing!")
+    balance = EasySQL.SQLColumn("Balance", EasySQL.Types.BIGINT.UNSIGNED, EasySQL.NOT_NULL) # int default is 0, no need to pass it
+    premium = EasySQL.SQLColumn("Premium", EasySQL.Types.BOOL, EasySQL.NOT_NULL, default=False)
 
-# Simply create a MyTable with its columns!
-@EasySQL.auto_init
-class MyTable(EasySQL.EasyTable, database=MyDatabase, name='MyTable'):
-    ID = EasySQL.EasyColumn('ID', EasySQL.Types.BIGINT, EasySQL.PRIMARY, EasySQL.AUTO_INCREMENT)
-    Name = EasySQL.EasyColumn('Name', EasySQL.Types.STRING(255), EasySQL.NOT_NULL, default='Missing')
-    Balance = EasySQL.EasyColumn('Balance', EasySQL.Types.INT, EasySQL.NOT_NULL)
-    Premium = EasySQL.EasyColumn('Premium', EasySQL.Types.BOOL, EasySQL.NOT_NULL, default=False)
+# Make sure to call database prepare once after a table is defined.
+# No need to do it per table, just one after all tables is enough.
+database.prepare()
 
+# Insert values with a simple command giving the data object!
+user_1 = User(name="Ashenguard", balance=100, premium=True) # Uses the default for any field mising!
+User.table.insert(user_1)       # Give a premade object...
+User.table.insert(name="Bob")   # Or let the method creates it!
 
-# Insert values with a simple command
-MyTable.insert('Ashenguard', True, 10).into(MyTable.Name, MyTable.Premium, MyTable.Balance).execute()
-MyTable.insert('Sam', False).into(MyTable.Name, MyTable.Premium).execute()
-
-# Let's add some random data
+# Let's  also add some random data
 from random import randint
-
 for i in range(5):
-    MyTable.insert(f'User-{i}', randint(0, 20)).into('Name', 'Balance').execute()
+    User.table.insert(name=f"User-{i}", balance=randint(0, 20))
 
-# Selecting data with another simple command
+# Selecting data with another simple command which returns a list of data fetched.
 ### Let's get all the data
-all = MyTable.select().execute()
-### Something that does not exist
-empty = MyTable.select(MyTable.ID).where(MyTable.Name.is_equal("NO-ONE")).execute()
-### To select multiple data give a list of columns as 1st argument
-premiums = MyTable.select(MyTable.ID, MyTable.Name).where(MyTable.Premium.is_equal(True)).execute()
-### You can have more complicated condition with AND (&), OR (|) and NOT (~)
-specific = MyTable.select(MyTable.Name).where(MyTable.Name.is_like("Ash%").AND(MyTable.ID.is_lesser_equal(5))).execute()
-### Giving no column will select all the columns, Also you can use limit, offset and order to sort data
-second = MyTable.select().order(MyTable.Balance).descending().limit(1).offset(1).execute()
-top5 = MyTable.select().order(MyTable.Balance).descending().limit(5).execute()
-### If you want only one result, not a sequence of them! It will return a SelectData if a data is found or return None if none is found.
-one = MyTable.select().where(MyTable.Name.is_equal("Ashenguard")).just_one().execute()
+all_data = User.table.select()
+no_one = User.table.select(User.name == "NO-ONE") # This is Still a list
+mid_class = User.table.select(EasySQL.WhereIsBetween(User.balance, 50, 150))
+print(all_data, no_one, mid_class)
+### If you want only one object, then get one! Will return a User or None
+one_user = User.table.select(User.name == "Ashenguard", get_one=True)
+print("Type:", type(one_user))  # Prints User!
+### You can also define order, descending, limit and offset too!
+mixed = User.table.select(descending=True, limit=2, order=User.balance, offset=1)
+print(mixed)
 
-# The result will be an EmptySelectData if nothing was found, A SelectData if only one was found, Or a tuple of SelectData
-# All 3 of them are iterable, so it is safe to use a `for` loop for any result
-# To get data from the result you can use `get`, but it only contains columns requested in select method.
-for data in all:
-    print(data)
+# Advanced Where clauses!
+### While ==, !=, <, >, <=, >= work for common where clauses you can have them chained by binary operators
+eg_and = (User.id != 0) & (User.id < 5)
+eg_or = (User.id != 0) | (User.id < 5)
+eg_not = ~ (User.id > 5)
+### You also have access to more advanced ones like:
+EasySQL.WhereIsIn(User.id, [0, 1, 2])
+EasySQL.WhereIsBetween(User.id, 0, 5)
+EasySQL.WhereIsLike(User.name, "Ash%")
+### You can chain them with binary operators with general Where clauses or use AND, OR, NOT!
+EasySQL.WhereIsIn(User.id, [0, 1, 2]).AND(User.name == "Ash")
+EasySQL.WhereIsEqual(User.id, 5) | EasySQL.WhereIsIn(User.id, [0, 1, 2])
+EasySQL.WhereIsIn(User.id, [0, 1, 2]) | ((User.id != 0) & (User.id < 5))
 
-for data in top5:
-    print(f'{data.get(MyTable.ID)}: {data.get(MyTable.Name)}\tBalance: {data.get(MyTable.Balance)}')
+# Finally to update data you have also 2 approaches!
+### A. Let the object auto updates itself:
+### This approach will generate the Where clause by PRIMARY tags. Which means you can't change a primary value.
+one_user.balance += 5
+User.table.update(one_user) # The Where clause will be as if you've done: "User.id == one_user.id"
+### B. Give the where clause yourself!
+### It's useful if you have no primary key in your table, or you want to change a primary value!
+User.table.update_where(User.id == 1, premium=True)
+### You can also use the insert pattern and pass a whole new object, and it will update it whole!
+User.table.update_where(User.id == 2, User(name="Chosen one!", balance=1000000, premium=True))
 
-# To delete data just use the delete method
-MyTable.delete(MyTable.ID.is_greater(5)).execute()
+# Delete data with simple commands again!
+User.table.delete(User.id > 2)
+```
+### Async example
+Link to GitHub: https://github.com/AGM-Studio/EasySQL/blob/master/async_test.py
+```python
+import EasySQL
 
-# Update data with following command
-MyTable.update(MyTable.Premium).to(True).where(MyTable.ID.is_equal(3).OR(MyTable.Name.is_equal('Sam'))).execute()
+# The goal is to have both sync and async be the same as much as we can!
+# Check sync example for basic information, here only async related differences are shown!
+EasySQL.enable_debug()
 
-# Safety error on delete/update/set without a where statement
-# MyTable.delete() -> raise EasySQL.DatabaseSafetyException
-# Turn the safety off with following command.
-MyDatabase.remove_safety(confirm=True)
-# Now there will be no error, it will clean the all data that's why we had safety lock
-MyTable.delete().execute()
+# Tables and database should be defined before the main loop starts
+database = EasySQL.AsyncDatabase(
+    database="MyDatabase",
+    password="",
+)
 
-
-# If you want a custom class as your data holder you can use following examples
-### Make a subclass of SelectData class
-class DataHolderA(EasySQL.SQLData):
-    # do as you want but make use of __init__
-    def __init__(self, table, data_array, columns):
-        super().__init__(table, data_array, columns)
-
-
-### Add the "from_sql_data" class method to any class which will receive the SQLData
-class DataHolderB:
-    @classmethod
-    def from_sql_data(cls, data: EasySQL.SQLData):
-        # Analyze the data the way you like it's up to you!
-        return cls(data.get('ID'), data.get('Name'), data.get('Balance'), data.get('Premium'))
-
-    def __init__(self, id, name, balance, premium):
-        self.id = id
-        self.name = name
-        self.balance = balance
-        self.premium = premium
-
-
-# While creating the table class, give the data holder to it
-@EasySQL.auto_init
-class MyAdvancedTable(EasySQL.EasyTable, database=MyDatabase, name='MyTable', data_class=DataHolderB):
-    ID = EasySQL.EasyColumn('ID', EasySQL.Types.BIGINT, EasySQL.PRIMARY, EasySQL.AUTO_INCREMENT)
-    Name = EasySQL.EasyColumn('Name', EasySQL.Types.STRING(255), EasySQL.NOT_NULL, default='Missing')
-    Balance = EasySQL.EasyColumn('Balance', EasySQL.Types.INT, EasySQL.NOT_NULL)
-    Premium = EasySQL.EasyColumn('Premium', EasySQL.Types.BOOL, EasySQL.NOT_NULL, default=False)
+# It doesn't matter if you use SQLData or AsyncSQLData, SQLData will create the table based on the type of database.
+# But for IDE Compatibility we recommend to use AsyncSQLData for your async project!
+class User(EasySQL.AsyncSQLData, database=database, name="MyTable"):
+    id = EasySQL.SQLColumn("ID", EasySQL.Types.BIGINT, EasySQL.PRIMARY, EasySQL.AUTO_INCREMENT)
+    name = EasySQL.SQLColumn("Name", EasySQL.Types.STRING(255), EasySQL.NOT_NULL, default="Missing!")
+    balance = EasySQL.SQLColumn("Balance", EasySQL.Types.BIGINT.UNSIGNED, EasySQL.NOT_NULL) # int default is 0, no need to pass it
+    premium = EasySQL.SQLColumn("Premium", EasySQL.Types.BOOL, EasySQL.NOT_NULL, default=False)
 
 
-MyAdvancedTable.insert(f'Random', randint(0, 20)).into('Name', 'Balance').execute()
-random = MyAdvancedTable.select().just_one().execute()
-print(random, random.name, random.balance, random.premium)
+# All other tasks should be done inside a main loop!
+# Everything is the same as the sync, but we need to await all database requests...
+async def main():
+    await database.prepare()
+
+    user_1 = User(name="Ashenguard", balance=100, premium=True)
+    await User.table.insert(user_1)
+    await User.table.insert(name="Bob")
+
+    from random import randint
+    for i in range(5):
+        await User.table.insert(name=f"User-{i}", balance=randint(0, 20))
+
+    all_data = await User.table.select()
+    no_one = await User.table.select(User.name == "NO-ONE")
+    mid_class = await User.table.select(EasySQL.WhereIsBetween(User.balance, 50, 150))
+    print(all_data, no_one, mid_class)
+
+    one_user = await User.table.select(User.name == "Ashenguard", get_one=True)
+    print("Type:", type(one_user))
+
+    mixed = await User.table.select(descending=True, limit=2, order=User.balance, offset=1)
+    print(mixed)
+
+    # Where clauses have no ASYNC change!
+    eg_and = (User.id != 0) & (User.id < 5)
+    eg_or = (User.id != 0) | (User.id < 5)
+    eg_not = ~ (User.id > 5)
+
+    EasySQL.WhereIsIn(User.id, [0, 1, 2])
+    EasySQL.WhereIsBetween(User.id, 0, 5)
+    EasySQL.WhereIsLike(User.name, "Ash%")
+
+    EasySQL.WhereIsIn(User.id, [0, 1, 2]).AND(User.name == "Ash")
+    EasySQL.WhereIsEqual(User.id, 5) | EasySQL.WhereIsIn(User.id, [0, 1, 2])
+    EasySQL.WhereIsIn(User.id, [0, 1, 2]) | ((User.id != 0) & (User.id < 5))
+
+
+    one_user.balance += 5
+    await User.table.update(one_user)
+    await User.table.update_where(User.id == 1, premium=True)
+    await User.table.update_where(User.id == 2, User(name="Chosen one!", balance=1000000, premium=True))
+
+    await User.table.delete(User.id > 2)
+
+
+# Let's run the main loop!
+import asyncio
+
+asyncio.run(main())
 ```
 
 [![Advertisement Banner](https://2captcha.com/referral-banners/2captcha/08.gif)](https://2captcha.com/?from=19092307)
-
-## Extras & Features
-1. Need unsigned types? EasySQL has them.
-> `BIGINT.UNSIGNED`, `INT.UNSIGNED`, `MEDIUMINT.UNSIGNED`, `SMALLINT.UNSIGNED`
-2. Afraid of unsigned or signed values? EasySQL will check them for you!
-> Raises `ValueError` if you are out of bound
-3. Multiple primary keys? EasySQL will take care of it.
-> Tag them with `PRIMARY` or add them to `YourTableClass.PRIMARY`
-4. Want to mark multiple columns as unique together? EasySQL have it.
-> Add `Unique(column_1, column_2)` to `YourTableClass.UNIQUES`
-5. Auto cast data & auto convert to your classes!
