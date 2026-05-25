@@ -1,4 +1,4 @@
-from typing import TypeVar, Generic, Dict, Type, Iterable, Optional, List
+from typing import TypeVar, Generic, Dict, Type, Iterable, Optional, List, Any, Tuple
 
 __all__ = [
     "SQLType", "BitSQLType", "IntegerSQLType", "UnsignedIntegerSQLType", "SignedIntegerSQLType",
@@ -206,73 +206,56 @@ class Where:
         return self.sql()
 
     def __and__(self, other):
-        if isinstance(other, Where):
-            return self.AND(other)
-
+        if isinstance(other, Where): return self.AND(other)
         raise TypeError(f"unsupported operand type(s) for &: \"{type(self)}\" and \"{type(other)}\"")
 
     def __or__(self, other):
-        if isinstance(other, Where):
-            return self.OR(other)
-
+        if isinstance(other, Where): return self.OR(other)
         raise TypeError(f"unsupported operand type(s) for |: \"{type(self)}\" and \"{type(other)}\"")
 
     def __invert__(self):
         return self.NOT()
 
 
-class WhereIsEqual(Where):
-    def __init__(self, column, value):
+class WhereColumnIs(Where):
+    def __init_subclass__(cls, op: str = None, **kwargs):
+        cls.op = op
+
+    def __init__(self, column, value, operand: str = None):
         self.value = value
         self.column = column
-        super().__init__(f"{column.name} = {column.parse(value)}")
+        if operand is None: operand = self.op
+        if operand is None: raise ValueError("Operand cannot be None")
+        super().__init__(f"{column.name} {operand} {column.parse(value)}")
 
-    def __invert__(self):
+
+class WhereIsEqual(WhereColumnIs, op="="):
+    def NOT(self):
         return WhereIsNotEqual(self.column, self.value)
 
 
-class WhereIsNotEqual(Where):
-    def __init__(self, column, value):
-        self.value = value
-        self.column = column
-        super().__init__(f"{column.name} <> {column.parse(value)}")
-
-    def __invert__(self):
+class WhereIsNotEqual(WhereColumnIs, op="<>"):
+    def NOT(self):
         return WhereIsEqual(self.column, self.value)
 
 
-class WhereIsGreater(Where):
+class WhereIsGreater(WhereColumnIs, op=">"): ...
+class WhereIsGreaterEqual(WhereColumnIs, op=">="): ...
+
+class WhereIsLesser(WhereColumnIs, op="<"): ...
+class WhereIsLesserEqual(WhereColumnIs, op="<="): ...
+
+class WhereIsLike(WhereColumnIs, op="LIKE"):
     def __init__(self, column, value):
-        super().__init__(f"{column.name} > {column.parse(value)}")
-
-
-class WhereIsGreaterEqual(Where):
-    def __init__(self, column, value):
-        super().__init__(f"{column.name} >= {column.parse(value)}")
-
-
-class WhereIsLesser(Where):
-    def __init__(self, column, value):
-        super().__init__(f"{column.name} < {column.parse(value)}")
-
-
-class WhereIsLesserEqual(Where):
-    def __init__(self, column, value):
-        super().__init__(f"{column.name} <= {column.parse(value)}")
-
-
-class WhereIsLike(Where):
-    def __init__(self, column, value):
-        super().__init__(f"{column.name} LIKE {column.parse(value).replace("%", "%%")}")
+        super().__init__(column, str(value).replace("%", "%%"))
 
 
 class WhereIsIn(Where):
-    def __init__(self, column, values):
-        values = (column.parse(value) for value in values)
-        super().__init__(f"{column.name} IN {values}")
+    def __init__(self, column, values: Iterable):
+        values = [column.parse(value) for value in values]
+        super().__init__(f"{column.name} IN {tuple(values)}")
 
 
 class WhereIsBetween(Where):
     def __init__(self, column, a, b):
-        values = (column.parse(a), column.parse(b))
-        super().__init__(f"{column.name} = {values}")
+        super().__init__(f"{column.name} BETWEEN {a} AND {b}")

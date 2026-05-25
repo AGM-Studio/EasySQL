@@ -8,7 +8,7 @@ from .logger import logger
 from .sql import (
     Where, WhereIsEqual, WhereIsNotEqual,
     WhereIsGreaterEqual, WhereIsGreater,
-    WhereIsLesserEqual, WhereIsLesser, SQLType, Types
+    WhereIsLesserEqual, WhereIsLesser, SQLType, Types, WhereColumnIs
 )
 
 T = TypeVar("T")
@@ -351,7 +351,7 @@ class SQLColumnExpr(Generic[T]):
     def __str__(self):
         return self.name
 
-    def _create_where(self, where_type: Type[Where], value):
+    def _create_where(self, where_type: Type[WhereColumnIs], value):
         try:
             return where_type(self, self.sql_type.cast(value))
         except Exception as e:
@@ -361,46 +361,22 @@ class SQLColumnExpr(Generic[T]):
         if isinstance(other, SQLColumnExpr):
             return self.name == other.name and self.sql_type == other.sql_type
 
-        try:
-            value = self.sql_type.cast(other)
-            return WhereIsEqual(self, value)
-        except Exception:
-            raise TypeError(f"Unable to create Where clause by \"{other}\"({type(other)})")
+        return self._create_where(WhereIsEqual, other)
 
     def __ne__(self, other):
-        try:
-            value = self.sql_type.cast(other)
-            return WhereIsNotEqual(self, value)
-        except Exception:
-            raise TypeError(f"Unable to create Where clause by \"{other}\"({type(other)})")
+        return self._create_where(WhereIsNotEqual, other)
 
     def __le__(self, other):
-        try:
-            value = self.sql_type.cast(other)
-            return WhereIsLesserEqual(self, value)
-        except Exception:
-            raise TypeError(f"Unable to create Where clause by \"{other}\"({type(other)})")
+        return self._create_where(WhereIsLesserEqual, other)
 
     def __lt__(self, other):
-        try:
-            value = self.sql_type.cast(other)
-            return WhereIsLesser(self, value)
-        except Exception:
-            raise TypeError(f"Unable to create Where clause by \"{other}\"({type(other)})")
+        return self._create_where(WhereIsLesser, other)
 
     def __ge__(self, other):
-        try:
-            value = self.sql_type.cast(other)
-            return WhereIsGreaterEqual(self, value)
-        except Exception:
-            raise TypeError(f"Unable to create Where clause by \"{other}\"({type(other)})")
+        return self._create_where(WhereIsGreaterEqual, other)
 
     def __gt__(self, other):
-        try:
-            value = self.sql_type.cast(other)
-            return WhereIsGreater(self, value)
-        except Exception:
-            raise TypeError(f"Unable to create Where clause by \"{other}\"({type(other)})")
+        return self._create_where(WhereIsGreater, other)
 
     @property
     def table(self):

@@ -34,6 +34,9 @@ async def main():
 
     all_data = await User.table.select()
     no_one = await User.table.select(User.name == "NO-ONE")
+    mid_class = await User.table.select(EasySQL.WhereIsBetween(User.balance, 50, 150))
+    print(all_data, no_one, mid_class)
+
     one_user = await User.table.select(User.name == "Ashenguard", get_one=True)
     print("Type:", type(one_user))
 

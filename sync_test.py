@@ -34,6 +34,8 @@ for i in range(5):
 ### Let's get all the data
 all_data = User.table.select()
 no_one = User.table.select(User.name == "NO-ONE") # This is Still a list
+mid_class = User.table.select(EasySQL.WhereIsBetween(User.balance, 50, 150))
+print(all_data, no_one, mid_class)
 ### If you want only one object, then get one! Will return a User or None
 one_user = User.table.select(User.name == "Ashenguard", get_one=True)
 print("Type:", type(one_user))  # Prints User!
