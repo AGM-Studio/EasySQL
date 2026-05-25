@@ -34,6 +34,8 @@ mysql-connector: Which is the basic library for connecting to database
 Link on GitHub: https://github.com/AGM-Studio/EasySQL/blob/master/test.py
 
 ```python
+import EasySQL.database
+import EasySQL.sync.database
 import EasySQL
 
 # Enable debug mode if you like to get SPAMMED with SQL!
@@ -42,7 +44,7 @@ EasySQL.enable_debug()
 
 # Simply provide connection info to your database
 @EasySQL.auto_init
-class MyDatabase(EasySQL.SyncedDB):
+class MyDatabase(EasySQL.database.SyncedDB):
     _database = 'MyDatabase'
     _password = ''
     _host = '127.0.0.1'

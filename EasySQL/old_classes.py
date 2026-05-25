@@ -1,13 +1,13 @@
 import inspect
 from itertools import zip_longest
-from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type
+from typing import Optional, Union, Any, Sequence, TypeVar, Tuple, List, Type, Iterable
 
-from .ABC import SQLCommandExecutable
-from .Constants import Charset, SQLConstraints, SQLType, NOT_NULL, UNIQUE, PRIMARY, Unique
-from .Database import SyncedDB
-from .Exceptions import DatabaseSafetyException
-from .Logging import logger
-from .Where import WhereAble, Where
+from .sql import *
+from .constants import Charset, SQLConstraints, SQLType, NOT_NULL, UNIQUE, PRIMARY, Unique
+from . import SyncedDB
+from .exceptions import DatabaseSafetyException
+from .logger import logger
+
 
 __all__ = ['EasyTable', 'EasyColumn', 'EasyForeignColumn', 'SQLData', 'EmptySQLData']
 
@@ -61,7 +61,7 @@ class EmptySQLData(SQLData):
 SD = TypeVar('SD', bound=SQLData)
 
 
-class EasyColumn(WhereAble):
+class EasyColumn:
     def __init__(self, name: str, sql_type: SQLType, *tags: SQLConstraints, default: Any = None, order: int = None):
         self.name = name
         self.sql_type = sql_type
@@ -101,6 +101,33 @@ class EasyColumn(WhereAble):
 
     def cast(self, value):
         return self.sql_type.cast(value)
+
+    def is_equal(self: "EasyColumn", value) -> WhereIsEqual:
+        return WhereIsEqual(self, value)
+
+    def is_not_equal(self: "EasyColumn", value) -> WhereIsNotEqual:
+        return WhereIsNotEqual(self, value)
+
+    def is_greater(self: "EasyColumn", value) -> WhereIsGreater:
+        return WhereIsGreater(self, value)
+
+    def is_greater_equal(self: "EasyColumn", value) -> WhereIsGreaterEqual:
+        return WhereIsGreaterEqual(self, value)
+
+    def is_lesser(self: "EasyColumn", value) -> WhereIsLesser:
+        return WhereIsLesser(self, value)
+
+    def is_lesser_equal(self: "EasyColumn", value) -> WhereIsLesserEqual:
+        return WhereIsLesserEqual(self, value)
+
+    def is_like(self: "EasyColumn", value) -> WhereIsLike:
+        return WhereIsLike(self, value)
+
+    def is_in(self: "EasyColumn", values: Iterable) -> WhereIsIn:
+        return WhereIsIn(self, values)
+
+    def is_between(self: "EasyColumn", a, b) -> WhereIsBetween:
+        return WhereIsBetween(self, a, b)
 
 
 class EasyForeignColumn(EasyColumn):
@@ -341,13 +368,13 @@ class Select(SQLCommandExecutable):
         self._force_one = False
         self._convertor = None
 
-    def get_value(self) -> str:
+    def sql(self) -> str:
         parts = [
             f"SELECT {', '.join([col.name for col in self._columns]) if self._columns else '*'}",
             f"FROM {self._table.name}",
         ]
         if self._where:
-            parts.append(self._where.get_value())
+            parts.append(self._where.sql())
         if self._order:
             parts.append(f"ORDER BY {', '.join([col.name for col in self._order])}{' DESC' if self._desc else ''}")
         limit = 1 if self._force_one else self._limit
@@ -392,7 +419,7 @@ class Insert(SQLCommandExecutable):
         self._values = values
         self._update = True
 
-    def get_value(self) -> str:
+    def sql(self) -> str:
         if len(self._columns) != len(self._values):
             raise ValueError('Values length do not match with the columns of the table')
 
@@ -425,12 +452,12 @@ class Update(SQLCommandExecutable):
         self._values = []
         self._where = None
 
-    def get_value(self) -> str:
+    def sql(self) -> str:
         if len(self._columns) != len(self._values):
             raise ValueError('Values length do not match with the columns')
 
         set_command = ', '.join([f'{column.name} = {column.parse(value)}' for column, value in zip(self._columns, self._values)])
-        return f"UPDATE {self._table.name} SET {set_command}" + f' {self._where.get_value()};' if self._where else ";"
+        return f"UPDATE {self._table.name} SET {set_command}" + f' {self._where.sql()};' if self._where else ";"
 
     def execute(self):
         if self._database.safe and self._where is None:
@@ -453,8 +480,8 @@ class Delete(SQLCommandExecutable):
         self._table = table
         self._where = where
 
-    def get_value(self) -> str:
-        return f"DELETE FROM {self._table.name}" + (f' {self._where.get_value()};' if self._where else ";")
+    def sql(self) -> str:
+        return f"DELETE FROM {self._table.name}" + (f' {self._where.sql()};' if self._where else ";")
 
     def execute(self):
         if self._database.safe and self._where is None:

@@ -1,26 +1,73 @@
-from typing import TYPE_CHECKING, Iterable
+from abc import ABC
+from inspect import currentframe
+from typing import TypeVar
 
-from .ABC import SQLCommand
-if TYPE_CHECKING:
-    from .Classes import EasyColumn
+from .logger import logger
+
+__all__ = [
+    "SQLObject", "SQLCommandExecutable", "make_collection", "is_collection",
+    "Where", "WhereIsEqual", "WhereIsNotEqual",
+    "WhereIsGreater", "WhereIsLesser", "WhereIsGreaterEqual", "WhereIsLesserEqual",
+    "WhereIsLike", "WhereIsIn", "WhereIsBetween"
+]
+
+T = TypeVar("T")
+
+
+class SQLObject(ABC):
+    def _set(self: T, **kwargs) -> T:
+        for key, value in kwargs.items():
+            setattr(self, f"_{key}", value)
+            
+        return self
+
+    def sql(self, *args, **kwargs) -> str:
+        raise NotImplementedError
+
+
+class SQLCommandExecutable(SQLObject, ABC):
+    _executed = False
+    def __del__(self):
+        if self._executed: return
+        caller_frame = currentframe().f_back
+        if caller_frame:
+            logger.warning(f"Command is created without being executed!\n\tLine #{caller_frame.f_lineno}: {caller_frame.f_code.co_filename}")
+        else:
+            logger.warning(f"One command is created without being executed!")
+
+    def execute(self, *args, **kwargs):
+        raise NotImplementedError
+
+
+def make_collection(value):
+    return value if is_collection(value) else [value]
+
+
+def is_collection(value):
+    return isinstance(value, (list, set, tuple))
 
 
 # noinspection PyPep8Naming
-class Where(SQLCommand):
+class Where(SQLObject):
     def __init__(self, sql_string):
         self.value = sql_string
 
-    def get_value(self) -> str:
+    def sql(self) -> str:
         return f"WHERE {self.value}"
 
-    def AND(self, other: "Where"):
+    def AND(self, other):
+        if not isinstance(other, Where): raise TypeError(f"Unsupported type \"{type(other)}\"")
         return Where(f"({self.value} AND {other.value})")
 
-    def OR(self, other: "Where"):
+    def OR(self, other):
+        if not isinstance(other, Where): raise TypeError(f"Unsupported type \"{type(other)}\"")
         return Where(f"({self.value} OR {other.value})")
 
     def NOT(self):
         return Where(f"NOT {self.value}")
+
+    def __repr__(self):
+        return self.sql()
 
     def __and__(self, other):
         if isinstance(other, Where):
@@ -40,12 +87,22 @@ class Where(SQLCommand):
 
 class WhereIsEqual(Where):
     def __init__(self, column, value):
+        self.value = value
+        self.column = column
         super().__init__(f"{column.name} = {column.parse(value)}")
+
+    def __invert__(self):
+        return WhereIsNotEqual(self.column, self.value)
 
 
 class WhereIsNotEqual(Where):
     def __init__(self, column, value):
+        self.value = value
+        self.column = column
         super().__init__(f"{column.name} <> {column.parse(value)}")
+
+    def __invert__(self):
+        return WhereIsEqual(self.column, self.value)
 
 
 class WhereIsGreater(Where):
@@ -83,40 +140,3 @@ class WhereIsBetween(Where):
     def __init__(self, column, a, b):
         values = (column.parse(a), column.parse(b))
         super().__init__(f"{column.name} = {values}")
-
-
-class WhereAble:
-    def is_equal(self: "EasyColumn", value) -> WhereIsEqual:
-        return WhereIsEqual(self, value)
-
-    def is_not_equal(self: "EasyColumn", value) -> WhereIsNotEqual:
-        return WhereIsNotEqual(self, value)
-
-    def is_greater(self: "EasyColumn", value) -> WhereIsGreater:
-        return WhereIsGreater(self, value)
-
-    def is_greater_equal(self: "EasyColumn", value) -> WhereIsGreaterEqual:
-        return WhereIsGreaterEqual(self, value)
-
-    def is_lesser(self: "EasyColumn", value) -> WhereIsLesser:
-        return WhereIsLesser(self, value)
-
-    def is_lesser_equal(self: "EasyColumn", value) -> WhereIsLesserEqual:
-        return WhereIsLesserEqual(self, value)
-
-    def is_like(self: "EasyColumn", value) -> WhereIsLike:
-        return WhereIsLike(self, value)
-
-    def is_in(self: "EasyColumn", values: Iterable) -> WhereIsIn:
-        return WhereIsIn(self, values)
-
-    def is_between(self: "EasyColumn", a, b) -> WhereIsBetween:
-        return WhereIsBetween(self, a, b)
-
-
-__all__ = [
-    "Where", "WhereIsEqual", "WhereIsNotEqual",
-    "WhereIsGreater", "WhereIsLesser", "WhereIsGreaterEqual", "WhereIsLesserEqual",
-    "WhereIsLike", "WhereIsIn", "WhereIsBetween",
-    "WhereAble"
-]

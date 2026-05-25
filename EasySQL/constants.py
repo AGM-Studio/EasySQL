@@ -1,9 +1,10 @@
-from typing import TYPE_CHECKING, Any, List, Dict, Callable, Iterable
-
+from typing import TYPE_CHECKING, Any, List, Dict, Callable, Iterable, Generic, TypeVar, Type
 
 if TYPE_CHECKING:
-    from .Classes import EasyColumn
+    from .classes import SQLColumnExpr
 
+
+T = TypeVar('T')
 __all__ = [
     "PRIMARY", "NOT_NULL", "AUTO_INCREMENT", "UNIQUE", "Unique",
     "SQLConstraints", "Charsets", "Charset", "Types", "SQLType"
@@ -28,7 +29,7 @@ class Unique(SQLConstraints):
     Constraint representing unique
     """
 
-    def __init__(self, *columns: "EasyColumn", name: str = None):
+    def __init__(self, *columns: "SQLColumnExpr", name: str = None):
         """
         Unique constractor
 
@@ -108,7 +109,7 @@ class Charsets:
 
 
 # Types -------------------------------------------------------------------------------------------------------- #
-def _get_int_cast_(size, unsigned=False):
+def _get_int_cast_(size, unsigned=False) -> Callable[[Any], int]:
     minimum = 0 if unsigned else (-(2 ** (size - 1)))
     maximum = 2 ** size if unsigned else (2 ** (size - 1) - 1)
 
@@ -126,29 +127,20 @@ def _get_int_cast_(size, unsigned=False):
 
 
 def _float_cast(value):
-    if value is None:
-        return None
-
-    return float(value)
+    return None if value is None else float(value)
 
 
 def _string_cast(value):
-    if value is None:
-        return None
-
-    return f"{value}"
+    return None if value is None else str(value)
 
 
 def _string_parse(value):
-    if value is None:
-        return 'null'
-
-    return f"'{value}'"
+    return 'null' if value is None else f"'{value}'"
 
 
-class SQLType:
+class SQLType(Generic[T]):
     mapping: Dict[str, "SQLType"] = {}
-    def __init__(self, name, *args, other_names: List[str] = None, caster: Callable[[Any], Any] = None, get_caster: Callable[["SQLType"], Callable[[Any], Any]] = None, default: Any = None, parser: Callable[[Any], str] = None, modifiable: bool = False, tags: Iterable[str] = None):
+    def __init__(self, name, *args, other_names: List[str] = None, caster: Callable[[Any], T] = None, get_caster: Callable[["SQLType"], Callable[[Any], T]] = None, default: Any = None, parser: Callable[[Any], str] = None, modifiable: bool = False, tags: Iterable[str] = None):
         self._name = name
         self._args = args
         self._tags = tags or ()
@@ -157,7 +149,6 @@ class SQLType:
 
         if caster is None and get_caster is not None:
             caster = get_caster(self)
-
         if caster is None:
             raise NotImplementedError('cast method is not implemented')
 
@@ -184,10 +175,7 @@ class SQLType:
         raise SQLTypeException('this sql type is not accepting new arguments')
 
     def __eq__(self, other):
-        try:
-            return other.name == self.name and other.args == self.args
-        except Exception:
-            return False
+        return isinstance(other, SQLType) and other.name == self.name and other.args == self.args
 
     def __hash__(self):
         return hash((self.name, self.args))
@@ -203,14 +191,14 @@ class SQLType:
     def tags(self):
         return self._tags
 
-    def cast(self, value):
+    def cast(self, value) -> T:
         return self._caster(value)
 
-    def parse(self, value):
+    def parse(self, value) -> str:
         return self._parser(self.cast(value))
 
     @property
-    def default(self):
+    def default(self) -> T:
         return self._default
 
     @property
@@ -222,7 +210,7 @@ class SQLType:
         return self._modifiable
 
 
-class IntegerSQLType(SQLType):
+class IntegerSQLType(SQLType[int]):
     def __init__(self, name, bit_size, default: Any = None, unsigned: bool = False, other_names: List[str] = None):
         super().__init__(name, other_names=other_names, caster=_get_int_cast_(bit_size), default=default)
 
@@ -234,10 +222,8 @@ class IntegerSQLType(SQLType):
 
     # noinspection PyPep8Naming
     @property
-    def UNSIGNED(self) -> SQLType:
-        if self._unsigned:
-            return self._unsigned
-
+    def UNSIGNED(self) -> SQLType[int]:
+        if self._unsigned: return self._unsigned
         raise TypeError(f'{self.name} can not support unsigned')
 
 
@@ -248,13 +234,13 @@ class Types:
     INT16 = SMALLINT = IntegerSQLType('SMALLINT', 16, 0, True)
     INT8 = TINYINT = IntegerSQLType('TINYINT', 8, 0, False)
 
-    BIT = SQLType(
+    BIT: SQLType[int] = SQLType(
         'BIT', 1, default=0, modifiable=True,
         get_caster=lambda self: _get_int_cast_(self.args[0])
     )
     BOOL = SQLType(
         'BIT', 1, default=False, other_names=['bool', 'boolean'],
-        caster=lambda value: None if value is None else True if value else False,
+        caster=lambda value: None if value is None else value == b'\x01',
         parser=lambda value: '1' if value else '0'
     )
 

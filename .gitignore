@@ -1,6 +1,6 @@
 build
 dist
-test*
+sync_test.py
 *egg-info
 upload.ipynb
 .idea
