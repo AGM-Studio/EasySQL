@@ -47,7 +47,7 @@ class ABCSQLTable(ABC, Generic[D, DB]):
         self.database.add_to_prepare(self._prepare())
 
     @abstractmethod
-    def insert(self, _: D = None, __update=True, **kwargs): ...
+    def insert(self, _: D = None, *, _update=True, **kwargs): ...
 
     @abstractmethod
     def insert_with_no_update(self, _: D = None, **kwargs): ...
@@ -56,9 +56,15 @@ class ABCSQLTable(ABC, Generic[D, DB]):
     def select(
             self, where = None, *,
             order: Union[Iterable, "SQLColumnExpr", str] = None, descending: bool = False,
-            limit: int = None, get_one: bool = None,
+            limit: int = None, offset: int = None
+    ) -> List[D]: ...
+
+    @abstractmethod
+    def select_one(
+            self, where = None, *,
+            order: Union[Iterable, "SQLColumnExpr", str] = None, descending: bool = False,
             offset: int = None
-    ): ...
+    ) -> Optional[D]: ...
 
     @abstractmethod
     def delete(self, where): ...
@@ -187,8 +193,7 @@ class ABCSQLTable(ABC, Generic[D, DB]):
     def _get_select_command(
             self, where: Where = None, *,
             order: Union[Iterable, "SQLColumnExpr", str] = None, descending: bool = False,
-            limit: int = None, get_one: bool = None,
-            offset: int = None
+            limit: int = None, offset: int = None
     ):
         parts = [f"SELECT * FROM {self.name}"]
         if where: parts.append(where.sql())
@@ -203,7 +208,6 @@ class ABCSQLTable(ABC, Generic[D, DB]):
             logger.warn(f"Unknown ordering type {type(order)}")
         if order is not None: parts.append(f"ORDER BY {', '.join(order)}{' DESC' if descending else ''}")
 
-        limit = 1 if get_one else limit
         if limit is not None: parts.append(f"LIMIT {limit}")
         if offset is not None: parts.append(f"OFFSET {offset}")
         return " ".join(parts) + ";"
@@ -211,13 +215,13 @@ class ABCSQLTable(ABC, Generic[D, DB]):
     def _get_delete_command(self, where: Where = None):
         return f"DELETE FROM {self.name} {where.sql()};"
 
-    def _convert_select_result(self, result: tuple, get_one: bool):
+    def _convert_select_result(self, result: tuple):
         objects = []
         for data in result:
             kw = {c[0]: c[1].cast(v) for c, v in zip(self._columns.items(), data)}
             objects.append(self.data_class(**kw))
 
-        return objects if not get_one else objects[0] if len(objects) > 0 else None
+        return objects
 
     def get_primary_where_for(self, obj: D) -> Where:
         if len(self.primary_map) == 0: raise ValueError("There is no primary in your table to generate the Where clause.")
@@ -231,21 +235,26 @@ class ABCSQLTable(ABC, Generic[D, DB]):
 
 class SyncedSQLTable(ABCSQLTable[D, SyncedDB]):
     def insert_with_no_update(self, _: D = None, **kwargs):
-        return self.insert(_, __update=False, **kwargs)
+        return self.insert(_, _update=False, **kwargs)
 
-    def insert(self, _: D = None, *, __update=True, **kwargs):
-        return self.database.execute(self._get_insert_command(_, __update, **kwargs))
+    def insert(self, _: D = None, *, _update=True, **kwargs):
+        return self.database.execute(self._get_insert_command(_, _update, **kwargs))
 
     def select(
-            self, where = None, *,
+            self, where=None, *,
             order: Union[Iterable, "SQLColumnExpr", str] = None, descending: bool = False,
-            limit: int = None, get_one: bool = None,
+            limit: int = None, offset: int = None
+    ) -> List[D]:
+        result = self.database.execute(self._get_select_command(where, order=order, descending=descending, limit=limit, offset=offset),auto_commit=False)
+        return self._convert_select_result(result)
+
+    def select_one(
+            self, where=None, *,
+            order: Union[Iterable, "SQLColumnExpr", str] = None, descending: bool = False,
             offset: int = None
-    ):
-        result = self.database.execute(self._get_select_command(
-            where, order=order, descending=descending, limit=limit, get_one=get_one, offset=offset
-        ), auto_commit=False)
-        return self._convert_select_result(result, get_one)
+    ) -> Optional[D]:
+        objects = self.select(where, order=order, descending=descending, offset=offset, limit=1)
+        return objects[0] if objects else None
 
     def delete(self, where):
         return self.database.execute(self._get_delete_command(where))
@@ -259,21 +268,26 @@ class SyncedSQLTable(ABCSQLTable[D, SyncedDB]):
 
 class AsyncSQLTable(ABCSQLTable[D, AsyncDB]):
     async def insert_with_no_update(self, _: D = None, **kwargs):
-        return await self.insert(_, __update=False, **kwargs)
+        return await self.insert(_, _update=False, **kwargs)
 
-    async def insert(self, _: D = None, *, __update=True, **kwargs):
-        return await self.database.execute(self._get_insert_command(_, __update, **kwargs))
+    async def insert(self, _: D = None, *, _update=True, **kwargs):
+        return await self.database.execute(self._get_insert_command(_, _update, **kwargs))
 
     async def select(
             self, where = None, *,
             order: Union[Iterable, "SQLColumnExpr", str] = None, descending: bool = False,
-            limit: int = None, get_one: bool = None,
+            limit: int = None, offset: int = None
+    ) -> List[D]:
+        result = await self.database.execute(self._get_select_command(where, order=order, descending=descending, limit=limit, offset=offset), auto_commit=False)
+        return self._convert_select_result(result)
+
+    async def select_one(
+            self, where = None, *,
+            order: Union[Iterable, "SQLColumnExpr", str] = None, descending: bool = False,
             offset: int = None
-    ):
-        result = await self.database.execute(self._get_select_command(
-            where, order=order, descending=descending, limit=limit, get_one=get_one, offset=offset
-        ), auto_commit=False)
-        return self._convert_select_result(result, get_one)
+    ) -> Optional[D]:
+        objects = await self.select(where, order=order, descending=descending, offset=offset, limit=1)
+        return objects[0] if objects else None
 
     async def delete(self, where):
         return await self.database.execute(self._get_delete_command(where))

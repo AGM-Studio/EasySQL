@@ -37,7 +37,7 @@ async def main():
     mid_class = await User.table.select(EasySQL.WhereIsBetween(User.balance, 50, 150))
     print(all_data, no_one, mid_class)
 
-    one_user = await User.table.select(User.name == "Ashenguard", get_one=True)
+    one_user = await User.table.select_one(User.name == "Ashenguard")
     print("Type:", type(one_user))
 
     mixed = await User.table.select(descending=True, limit=2, order=User.balance, offset=1)

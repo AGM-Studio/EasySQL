@@ -37,7 +37,7 @@ no_one = User.table.select(User.name == "NO-ONE") # This is Still a list
 mid_class = User.table.select(EasySQL.WhereIsBetween(User.balance, 50, 150))
 print(all_data, no_one, mid_class)
 ### If you want only one object, then get one! Will return a User or None
-one_user = User.table.select(User.name == "Ashenguard", get_one=True)
+one_user = User.table.select_one(User.name == "Ashenguard")
 print("Type:", type(one_user))  # Prints User!
 ### You can also define order, descending, limit and offset too!
 mixed = User.table.select(descending=True, limit=2, order=User.balance, offset=1)
