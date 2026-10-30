@@ -1,7 +1,7 @@
 import asyncio
 import threading
 from abc import ABC, abstractmethod
-from typing import Coroutine
+from typing import Coroutine, Callable
 
 import asyncmy
 
@@ -53,7 +53,7 @@ class ABCDatabase(ABC):
     def set_charset(self, charset: "Charset"): ...
 
     @abstractmethod
-    def add_to_prepare(self, prepare: Coroutine): ...
+    def add_to_prepare(self, prepare: Callable[[], Coroutine]): ...
 
     @abstractmethod
     def prepare(self): ...
@@ -132,6 +132,7 @@ class AsyncDB(ABCDatabase):
         return self._connection
 
     async def execute(self, command: str, params=(), auto_commit=True):
+        if len(self._prepares) > 0: await self.prepare()
         connection = await self.get_connection()
         logger.debug(
             f'SQL command has been requested to be executed:\n'
@@ -171,7 +172,7 @@ class AsyncDB(ABCDatabase):
             except Exception as e:
                 logger.warn(f"Altering the charset of database failed due {e}")
 
-    def add_to_prepare(self, prepare: Coroutine):
+    def add_to_prepare(self, prepare: Callable[[], Coroutine]):
         self._prepares.append(prepare)
 
     async def prepare(self):
@@ -224,7 +225,7 @@ class SyncedDB(ABCDatabase):
     def set_charset(self, charset: Charset):
         return self._run_sync(self.async_db.set_charset(charset))
 
-    def add_to_prepare(self, prepare: Coroutine):
+    def add_to_prepare(self, prepare: Callable[[], Coroutine]):
         self.async_db.add_to_prepare(prepare)
 
     def prepare(self):

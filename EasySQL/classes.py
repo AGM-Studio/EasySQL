@@ -44,7 +44,7 @@ class ABCSQLTable(ABC, Generic[D, DB]):
             column.tags = tuple([tag for tag in column.tags if tag != UNIQUE and tag != PRIMARY])
 
         self.__prepared = False
-        self.database.add_to_prepare(self._prepare())
+        self.database.add_to_prepare(self._prepare)
 
     @abstractmethod
     def insert(self, _: D = None, *, _update=True, **kwargs): ...
