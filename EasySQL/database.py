@@ -177,7 +177,8 @@ class AsyncDB(ABCDatabase):
 
     async def prepare(self):
         while self._prepares:
-            await self._prepares.pop(0)
+            prepare = self._prepares.pop(0)
+            await prepare()
 
 
 class SyncedDB(ABCDatabase):
