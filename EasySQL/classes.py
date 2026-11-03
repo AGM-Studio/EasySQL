@@ -152,9 +152,15 @@ class ABCSQLTable(ABC, Generic[D, DB]):
         return self.__prepared
 
     def get_column(self, target: Union[str, "SQLColumnExpr"], *, force=False) -> Optional["SQLColumnExpr"]:
-        if target in self._columns: return target
-        for column in self._columns.values():
-            if column.name == target: return column
+        if isinstance(target, str):
+            if target in self._columns:
+                return self._columns[target]
+
+            for column in self._columns.values():
+                if column.name == target: return column
+
+        elif target in self._columns.values():
+            return target
 
         if not force: return None
         raise ValueError(f"\"{target}\" is not implemented in the table({self.name}).")
